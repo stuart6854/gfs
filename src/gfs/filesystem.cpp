@@ -89,10 +89,18 @@ namespace gfs
         if (!mount)
             return false;
 
-        const auto finalPath = std::filesystem::canonical(mount->RootDirPath / path);
+        std::filesystem::path finalPath;
+        try
+        {
+            finalPath = std::filesystem::canonical(mount->RootDirPath / path);
+        }
+        catch (const std::exception& /*ex*/)
+        {
+            return false; // Path/File does not exists.
+        }
 
         auto [rootEnd, nothing] = std::mismatch(mount->RootDirPath.begin(), mount->RootDirPath.end(), finalPath.begin());
-        if (rootEnd != mount->RootDirPath.end())
+        if (rootEnd == mount->RootDirPath.end())
             return false;
 
         return true;
