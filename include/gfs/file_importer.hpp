@@ -1,5 +1,7 @@
 #pragma once
 
+#include "filesystem.hpp"
+
 #include <filesystem>
 
 namespace gfs
@@ -10,6 +12,6 @@ namespace gfs
         virtual ~FileImporter() = default;
 
         virtual bool Import(const std::filesystem::path& importFilename, const std::filesystem::path& outputDir) = 0;
-        virtual bool Reimport(const File& file) = 0;
+        virtual bool Reimport(const Filesystem::File& file) = 0;
     };
 }
