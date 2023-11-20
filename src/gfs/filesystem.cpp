@@ -12,12 +12,10 @@ namespace gfs
         if (!std::filesystem::is_directory(rootDir))
             return InvalidMountId;
 
-        auto& mount = m_mounts.emplace_back();
+        auto& mount = m_mountMap[m_nextMountId];
         mount.RootDirPath = rootDir;
         mount.AllowUnmount = allowUnmount;
         mount.Id = m_nextMountId++;
-
-        m_mountIdMap[mount.Id] = &mount;
 
         assert(mount.Id != InvalidMountId);
         return mount.Id;
@@ -25,17 +23,18 @@ namespace gfs
 
     bool Filesystem::UnmountDir(MountID id)
     {
-        auto* mount = GetMount(id);
-        if (!mount)
+        const auto it = m_mountMap.find(id);
+        if (it == m_mountMap.end())
             return false;
 
-        return mount->Id;
+        m_mountMap.erase(it);
+        return true;
     }
 
     auto Filesystem::GetMountId(const std::filesystem::path& rootDir) -> MountID
     {
         const auto rootDirAbs = std::filesystem::absolute(rootDir);
-        for (const auto& mount : m_mounts)
+        for (const auto& [id, mount] : m_mountMap)
         {
             const auto mountDirAbs = std::filesystem::absolute(mount.RootDirPath);
             if (rootDirAbs == mountDirAbs)
@@ -46,7 +45,7 @@ namespace gfs
 
     void Filesystem::ForEachMount(const std::function<void(const Mount&)>& func)
     {
-        for (const auto& mount : m_mounts)
+        for (const auto& [id, mount] : m_mountMap)
             func(mount);
     }
 
@@ -101,7 +100,7 @@ namespace gfs
 
     bool Filesystem::IsPathInAnyMount(const std::filesystem::path& path)
     {
-        for (const auto& mount : m_mounts)
+        for (const auto& [id, mount] : m_mountMap)
         {
             if (IsPathInMount(path, mount.Id))
                 return true;
@@ -111,11 +110,11 @@ namespace gfs
 
     auto Filesystem::GetMount(MountID id) -> Mount*
     {
-        const auto it = m_mountIdMap.find(id);
-        if (it == m_mountIdMap.end())
+        const auto it = m_mountMap.find(id);
+        if (it == m_mountMap.end())
             return nullptr;
 
-        return it->second;
+        return &it->second;
     }
 
 }

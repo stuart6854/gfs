@@ -129,8 +129,7 @@ namespace gfs
         auto GetMount(MountID id) -> Mount*;
 
     private:
-        std::vector<Mount> m_mounts;
-        std::unordered_map<MountID, Mount*> m_mountIdMap;
+        std::unordered_map<MountID, Mount> m_mountMap;
         MountID m_nextMountId = 1;
 
         std::vector<File> m_files;
