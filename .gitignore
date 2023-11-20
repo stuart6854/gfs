@@ -1,0 +1,9 @@
+﻿# Solution
+.vs/
+.vscode/
+.idea/
+*.user
+
+# Build
+bin/
+obj/
