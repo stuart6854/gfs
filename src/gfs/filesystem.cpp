@@ -1,5 +1,7 @@
 #include "gfs/filesystem.hpp"
 
+#include <lz4.h>
+
 #include <cassert>
 #include <fstream>
 
@@ -159,28 +161,39 @@ namespace gfs
         const auto dataSize = uint32_t(dataStream.tellg());
         dataStream.seekg(0, std::ios::beg);
 
-        std::vector<uint8_t> dataBuffer;
-        dataBuffer.reserve(dataSize);
-        dataBuffer.insert(dataBuffer.begin(),
+        std::vector<uint8_t> uncompressedDataBuffer;
+        uncompressedDataBuffer.reserve(dataSize);
+        uncompressedDataBuffer.insert(uncompressedDataBuffer.begin(),
             std::istream_iterator<uint8_t>(dataStream),
             std::istream_iterator<uint8_t>());
 
-        file.UncompressedSize = uint32_t(dataBuffer.size());
+        std::vector<uint8_t> compressedDataBuffer;
+        file.UncompressedSize = uint32_t(uncompressedDataBuffer.size());
         if (compress)
         {
-            // #TODO: Compress data.
+            compressedDataBuffer.resize(uncompressedDataBuffer.size());
+            const uint32_t compressedSize = LZ4_compress_default(
+                reinterpret_cast<const char*>(uncompressedDataBuffer.data()),
+                reinterpret_cast<char*>(compressedDataBuffer.data()),
+                int32_t(uncompressedDataBuffer.size()),
+                int32_t(compressedDataBuffer.size())
+            );
+            compressedDataBuffer.resize(compressedSize);
+            file.CompressedSize = compressedSize;
         }
         else
         {
+            compressedDataBuffer = uncompressedDataBuffer;
             file.CompressedSize = file.UncompressedSize;
         }
+        uncompressedDataBuffer.clear();
 
         stream << header;
         stream << file;
         const uint32_t dataOffset = uint32_t(stream.tellp());
         const uint32_t offsetPos = dataOffset - sizeof(file.Offset);
 
-        stream.write(reinterpret_cast<const char*>(dataBuffer.data()), sizeof(uint8_t) * dataBuffer.size());
+        stream.write(reinterpret_cast<const char*>(compressedDataBuffer.data()), sizeof(uint8_t) * compressedDataBuffer.size());
 
         // Go back and write data offset
         stream.seekp(offsetPos, std::ios::beg);

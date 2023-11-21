@@ -82,12 +82,13 @@ int main()
 
     TextResource texResource{};
     texResource.Text = ReadTextFile("external_files/txt_file.txt");
-    assert(fs.WriteFile("mount_a/aa/txt_file.rbin", 67236784, texResource, true));
+    assert(fs.WriteFile("mount_a/aa/txt_file.rbin", 67236784, texResource, false));
 
     TextResource texResourceBigger{};
     for (auto i = 0; i < 1000; ++i)
         texResourceBigger.Text += texResource.Text;
-    assert(fs.WriteFile("mount_b_locked/txt_file_bigger.rbin", 68923789324, texResourceBigger, true));
+    assert(fs.WriteFile("mount_b_locked/txt_file_bigger.rbin", 68923789324, texResourceBigger, false));
+    assert(fs.WriteFile("mount_b_locked/txt_file_bigger_compressed.rbin", 8367428478, texResourceBigger, true));
 
     std::cout << "Files" << std::endl;
     fs.ForEachFile([](const gfs::Filesystem::File& file) {
