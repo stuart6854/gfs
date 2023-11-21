@@ -114,6 +114,10 @@
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="include\gfs\binary_streams.hpp">
+      <SubType>
+      </SubType>
+    </ClInclude>
     <ClInclude Include="include\gfs\file_importer.hpp">
       <SubType>
       </SubType>
@@ -128,6 +132,7 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\gfs\binary_streams.cpp" />
     <ClCompile Include="src\gfs\filesystem.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

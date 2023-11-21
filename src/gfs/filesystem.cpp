@@ -4,6 +4,7 @@
 
 #include <cassert>
 #include <fstream>
+#include <iostream>
 
 namespace gfs
 {
@@ -165,49 +166,51 @@ namespace gfs
 
     void Filesystem::ValidateAndRegisterFile(const std::filesystem::path& filename, MountID mountId)
     {
-        std::ifstream stream(filename, std::ios::binary);
+        BinaryStreamRead stream(filename);
         if (!stream)
             return;
 
         FormatHeader header{};
-        stream >> header;
+        stream.Read(header);
 
         if (std::memcmp(header.MagicNumber, FS_FORMAT_MAGIC_NUM, sizeof(header.MagicNumber)) != 0)
             return;
 
         File file{};
-        stream >> file;
+        stream.Read(file);
 
         file.MountId = mountId;
         file.MountRelPath = filename;
         m_files[file.FileId] = file;
     }
 
-    bool Filesystem::WriteFile(const std::filesystem::path& filename, File file, const std::filesystem::path& dataFilename, bool compress)
+    bool Filesystem::WriteFile(const std::filesystem::path& filename, FileID fileId, const BinaryStreamable& dataObject, bool compress)
     {
-        FormatHeader header{};
-        std::memcpy(header.MagicNumber, FS_FORMAT_MAGIC_NUM, sizeof(FS_FORMAT_MAGIC_NUM));
-        header.FormatVersion = FS_FORMAT_VERSION;
-        header.FileCount = 1;
+        const auto tempBinaryFile = filename.string() + ".tmp";
 
-        std::ofstream stream(filename, std::ios::binary);
+        BinaryStreamWrite tempFileStream(tempBinaryFile);
+        if (!tempFileStream)
+            return false;
+
+        tempFileStream.Write(dataObject);
+        const auto binaryDataSize = tempFileStream.TellP();
+        tempFileStream.Close();
+
+        BinaryStreamWrite stream(filename);
         if (!stream)
             return false;
 
-        std::ifstream dataStream(dataFilename, std::ios::binary | std::ios::ate);
+        BinaryStreamRead dataStream(tempBinaryFile);
         if (!dataStream)
             return false;
 
-        dataStream.unsetf(std::ios_base::skipws); // Do not ignore whitespace.
+        auto uncompressedDataBuffer = dataStream.Read(binaryDataSize);
+        dataStream.Close();
 
-        const auto dataSize = uint32_t(dataStream.tellg());
-        dataStream.seekg(0, std::ios::beg);
-
-        std::vector<uint8_t> uncompressedDataBuffer;
-        uncompressedDataBuffer.reserve(dataSize);
-        uncompressedDataBuffer.insert(uncompressedDataBuffer.begin(),
-            std::istream_iterator<uint8_t>(dataStream),
-            std::istream_iterator<uint8_t>());
+        File file{};
+        file.FileId = fileId;
+        file.MountId = GetMountPathIsIn(filename);
+        file.FileDependencies = {};
 
         std::vector<uint8_t> compressedDataBuffer;
         file.UncompressedSize = uint32_t(uncompressedDataBuffer.size());
@@ -230,59 +233,75 @@ namespace gfs
         }
         uncompressedDataBuffer.clear();
 
-        stream << header;
-        stream << file;
-        const uint32_t dataOffset = uint32_t(stream.tellp());
+        FormatHeader header{};
+        std::memcpy(header.MagicNumber, FS_FORMAT_MAGIC_NUM, sizeof(FS_FORMAT_MAGIC_NUM));
+        header.FormatVersion = FS_FORMAT_VERSION;
+        header.FileCount = 1;
+
+        stream.Write(header);
+        stream.Write(file);
+        const uint32_t dataOffset = uint32_t(stream.TellP());
         const uint32_t offsetPos = dataOffset - sizeof(file.Offset);
 
-        stream.write(reinterpret_cast<const char*>(compressedDataBuffer.data()), sizeof(uint8_t) * compressedDataBuffer.size());
+        stream.Write(sizeof(uint8_t) * compressedDataBuffer.size(), compressedDataBuffer.data());
 
         // Go back and write data offset
-        stream.seekp(offsetPos, std::ios::beg);
-        stream.write(reinterpret_cast<const char*>(&dataOffset), sizeof(offsetPos));
+        stream.SeekP(offsetPos, false);
+        stream.Write(dataOffset);
+
+        bool exists = std::filesystem::exists(tempBinaryFile);
+        assert(exists);
+
+        std::filesystem::remove(tempBinaryFile); // #ERROR: This is throwing for some reason.
+        //try
+        //{
+        //    std::filesystem::remove(tempBinaryFile); // #ERROR: This is throwing for some reason.
+        //}
+        //catch (std::filesystem::filesystem_error const& ex)
+        //{
+        //    std::cout << "what():  " << ex.what() << '\n'
+        //        << "path1(): " << ex.path1() << '\n'
+        //        << "path2(): " << ex.path2() << '\n'
+        //        << "code().value():    " << ex.code().value() << '\n'
+        //        << "code().message():  " << ex.code().message() << '\n'
+        //        << "code().category(): " << ex.code().category().name() << '\n';
+        //}
+
+        m_files[file.FileId] = file; // Register new file.
 
         return true;
     }
 
-    auto operator<<(std::ostream& stream, const FormatHeader& header) -> std::ostream&
+    void FormatHeader::Read(BinaryStreamRead& stream)
     {
-        stream.write(reinterpret_cast<const char*>(&header.MagicNumber), sizeof(header.MagicNumber));
-        stream.write(reinterpret_cast<const char*>(&header.FormatVersion), sizeof(header.FormatVersion));
-        stream.write(reinterpret_cast<const char*>(&header.FileCount), sizeof(header.FileCount));
-        return stream;
+        stream.Read(sizeof(MagicNumber), MagicNumber);
+        stream.Read(FormatVersion);
+        stream.Read(FileCount);
     }
 
-    auto operator>>(std::istream& stream, FormatHeader& header) -> std::istream&
+    void FormatHeader::Write(BinaryStreamWrite& stream) const
     {
-        stream.read(reinterpret_cast<char*>(&header.MagicNumber), sizeof(header.MagicNumber));
-        stream.read(reinterpret_cast<char*>(&header.FormatVersion), sizeof(header.FormatVersion));
-        stream.read(reinterpret_cast<char*>(&header.FileCount), sizeof(header.FileCount));
-        return stream;
+        stream.Write(sizeof(MagicNumber), MagicNumber);
+        stream.Write(FormatVersion);
+        stream.Write(FileCount);
     }
 
-    auto operator<<(std::ostream& stream, const Filesystem::File& file) -> std::ostream&
+    void Filesystem::File::Read(BinaryStreamRead& stream)
     {
-        stream.write(reinterpret_cast<const char*>(&file.FileId), sizeof(file.FileId));
-        uint16_t count = uint16_t(file.FileDependencies.size());
-        stream.write(reinterpret_cast<const char*>(&count), sizeof(count));
-        stream.write(reinterpret_cast<const char*>(file.FileDependencies.data()), sizeof(FileID) * count);
-        stream.write(reinterpret_cast<const char*>(&file.UncompressedSize), sizeof(file.UncompressedSize));
-        stream.write(reinterpret_cast<const char*>(&file.CompressedSize), sizeof(file.CompressedSize));
-        stream.write(reinterpret_cast<const char*>(&file.Offset), sizeof(file.Offset));
-        return stream;
+        stream.Read(FileId);
+        stream.ReadVector(FileDependencies);
+        stream.Read(UncompressedSize);
+        stream.Read(CompressedSize);
+        stream.Read(Offset);
     }
 
-    auto operator>>(std::istream& stream, Filesystem::File& file) -> std::istream&
+    void Filesystem::File::Write(BinaryStreamWrite& stream) const
     {
-        stream.read(reinterpret_cast<char*>(&file.FileId), sizeof(file.FileId));
-        uint16_t count = 0;
-        stream.read(reinterpret_cast<char*>(&count), sizeof(count));
-        file.FileDependencies.resize(count);
-        stream.read(reinterpret_cast<char*>(file.FileDependencies.data()), sizeof(FileID) * count);
-        stream.read(reinterpret_cast<char*>(&file.UncompressedSize), sizeof(file.UncompressedSize));
-        stream.read(reinterpret_cast<char*>(&file.CompressedSize), sizeof(file.CompressedSize));
-        stream.read(reinterpret_cast<char*>(&file.Offset), sizeof(file.Offset));
-        return stream;
+        stream.Write(FileId);
+        stream.WriteVector(FileDependencies);
+        stream.Write(UncompressedSize);
+        stream.Write(CompressedSize);
+        stream.Write(Offset);
     }
 
 }

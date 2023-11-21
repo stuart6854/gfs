@@ -24,9 +24,15 @@
     <ClInclude Include="include\gfs\file_importer.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="include\gfs\binary_streams.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\gfs\filesystem.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\gfs\binary_streams.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
