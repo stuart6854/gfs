@@ -35,6 +35,9 @@ namespace gfs
         if (it == m_mountMap.end())
             return false;
 
+        if (!it->second.AllowUnmount)
+            return false;
+
         m_mountMap.erase(it);
         return true;
     }
