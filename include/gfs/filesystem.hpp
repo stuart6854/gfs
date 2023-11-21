@@ -7,14 +7,33 @@
 #include <string>
 #include <unordered_map>
 
+// #TODO: Create binary stream wrapper (to help force binary input/output): https://cplusplus.com/forum/general/97851/
+
 namespace gfs
 {
+    class FileImporter;
+
+    template<typename S, typename T, typename = void>
+    struct is_to_stream_writable : std::false_type {};
+
+    template<typename S, typename T>
+    struct is_to_stream_writable<S, T, std::void_t<decltype(std::declval<S&>() << std::declval<T>())>>
+        : std::true_type {};
+
     using MountID = uint32_t;
     using FileID = uint64_t;
 
     constexpr MountID InvalidMountId = 0;
 
-    class FileImporter;
+    struct FormatHeader
+    {
+        char MagicNumber[4];
+        uint16_t FormatVersion;
+        uint32_t FileCount;
+
+        friend auto operator<<(std::ostream& stream, const FormatHeader& header)->std::ostream&;
+        friend auto operator>>(std::istream& stream, FormatHeader& header)->std::istream&;
+    };
 
     class Filesystem
     {
@@ -67,10 +86,16 @@ namespace gfs
 
         struct File
         {
-            FileID Uuid; // The Unique Identifier of the file.
+            FileID FileId; // The Unique Identifier of the file.
             MountID MountId; // The Id of the mount this file is in.
             std::filesystem::path MountRelPath;// Path to this file relative to the mount it is in.
             std::vector<FileID> FileDependencies; // Files this file references.
+            uint32_t UncompressedSize;
+            uint32_t CompressedSize;
+            uint32_t Offset;
+
+            friend auto operator<<(std::ostream& stream, const File& file)->std::ostream&;
+            friend auto operator>>(std::istream& stream, File& file)->std::istream&;
         };
 
         /**
@@ -85,6 +110,9 @@ namespace gfs
          * @param func
         */
         void ForEachFile(const std::function<void(const File& file)>& func);
+
+        template<typename T>
+        bool WriteFile(const std::filesystem::path& filename, FileID fileId, const T& dataObject, bool compress);
 
         //////////////////////////////////////////////////////////////////////////
         // Import
@@ -128,6 +156,10 @@ namespace gfs
     private:
         auto GetMount(MountID id) -> Mount*;
 
+        auto GetMountPathIsIn(const std::filesystem::path& path) -> MountID;
+
+        bool WriteFile(const std::filesystem::path& filename, File file, const std::filesystem::path& dataFilename, bool compress);
+
     private:
         std::unordered_map<MountID, Mount> m_mountMap;
         MountID m_nextMountId = 1;
@@ -137,4 +169,30 @@ namespace gfs
 
         std::unordered_map < size_t, std::shared_ptr < FileImporter >> m_extImporterMap;
     };
+
+    template<typename T>
+    bool gfs::Filesystem::WriteFile(const std::filesystem::path& filename, FileID fileId, const T& dataObject, bool compress)
+    {
+        static_assert(is_to_stream_writable<std::fstream, T>::value, "dataType must be stream writable (operator<<()).");
+
+        const auto tempBinaryFile = filename.string() + ".tmp";
+        std::ofstream stream(tempBinaryFile, std::ios::binary);
+        if (!stream)
+            return false;
+
+        stream << dataObject;
+        stream.close();
+
+        File file{};
+        file.FileId = fileId;
+        file.MountId = GetMountPathIsIn(filename);
+        file.FileDependencies = {};
+
+        bool success = WriteFile(filename, file, tempBinaryFile, compress);
+
+        std::filesystem::remove(tempBinaryFile);
+
+        return success;
+    }
+
 }
