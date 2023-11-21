@@ -158,14 +158,16 @@ namespace gfs
 
         auto GetMountPathIsIn(const std::filesystem::path& path) -> MountID;
 
+        void GatherFilesInMount(const Mount& mount);
+        void ValidateAndRegisterFile(const std::filesystem::path& filename, MountID mountId);
+
         bool WriteFile(const std::filesystem::path& filename, File file, const std::filesystem::path& dataFilename, bool compress);
 
     private:
         std::unordered_map<MountID, Mount> m_mountMap;
         MountID m_nextMountId = 1;
 
-        std::vector<File> m_files;
-        std::unordered_map<uint64_t, File*> m_fileIdMap;
+        std::unordered_map<FileID, File> m_files;
 
         std::unordered_map < size_t, std::shared_ptr < FileImporter >> m_extImporterMap;
     };

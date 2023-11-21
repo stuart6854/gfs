@@ -22,8 +22,10 @@ namespace gfs
         mount.RootDirPath = rootDir;
         mount.AllowUnmount = allowUnmount;
         mount.Id = m_nextMountId++;
-
         assert(mount.Id != InvalidMountId);
+
+        GatherFilesInMount(mount);
+
         return mount.Id;
     }
 
@@ -57,16 +59,16 @@ namespace gfs
 
     auto Filesystem::GetFile(FileID id) -> const File*
     {
-        const auto it = m_fileIdMap.find(id);
-        if (it == m_fileIdMap.end())
+        const auto it = m_files.find(id);
+        if (it == m_files.end())
             return nullptr;
 
-        return it->second;
+        return &it->second;
     }
 
     void Filesystem::ForEachFile(const std::function<void(const File& file)>& func)
     {
-        for (const auto& file : m_files)
+        for (const auto& [id, file] : m_files)
             func(file);
     }
 
@@ -139,6 +141,43 @@ namespace gfs
                 return id;
         }
         return InvalidMountId;
+    }
+
+    void Filesystem::GatherFilesInMount(const Mount& mount)
+    {
+        for (const auto& dirEntry : std::filesystem::recursive_directory_iterator(mount.RootDirPath))
+        {
+            if (!dirEntry.is_regular_file())
+                continue;
+
+            const auto filePath = dirEntry.path();
+
+            const auto fileSize = std::filesystem::file_size(filePath);
+            if (fileSize < sizeof(FormatHeader))
+                continue;
+
+            ValidateAndRegisterFile(filePath, mount.Id);
+        }
+    }
+
+    void Filesystem::ValidateAndRegisterFile(const std::filesystem::path& filename, MountID mountId)
+    {
+        std::ifstream stream(filename, std::ios::binary);
+        if (!stream)
+            return;
+
+        FormatHeader header{};
+        stream >> header;
+
+        if (std::memcmp(header.MagicNumber, FS_FORMAT_MAGIC_NUM, sizeof(header.MagicNumber)) != 0)
+            return;
+
+        File file{};
+        stream >> file;
+
+        file.MountId = mountId;
+        file.MountRelPath = filename;
+        m_files[file.FileId] = file;
     }
 
     bool Filesystem::WriteFile(const std::filesystem::path& filename, File file, const std::filesystem::path& dataFilename, bool compress)
