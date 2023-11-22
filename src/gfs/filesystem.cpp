@@ -186,7 +186,7 @@ namespace gfs
         m_files[file.FileId] = file;
     }
 
-    bool Filesystem::WriteFile(MountID mountId, const std::filesystem::path& filename, FileID fileId, const BinaryStreamable& dataObject, bool compress)
+    bool Filesystem::WriteFile(MountID mountId, const std::filesystem::path& filename, FileID fileId, const std::vector<FileID>& fileDependencies, const BinaryStreamable& dataObject, bool compress)
     {
         auto* mount = GetMount(mountId);
         if (!mount)
@@ -219,7 +219,7 @@ namespace gfs
         file.FileId = fileId;
         file.MountId = mountId;
         file.MountRelPath = filename;
-        file.FileDependencies = {};
+        file.FileDependencies = fileDependencies;
 
         std::vector<uint8_t> compressedDataBuffer;
         file.UncompressedSize = uint32_t(uncompressedDataBuffer.size());

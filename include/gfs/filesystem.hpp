@@ -121,7 +121,7 @@ namespace gfs
          * @param compress
          * @return
         */
-        bool WriteFile(MountID mountId, const std::filesystem::path& filename, FileID fileId, const BinaryStreamable& dataObject, bool compress);
+        bool WriteFile(MountID mountId, const std::filesystem::path& filename, FileID fileId, const std::vector<FileID>& fileDependencies, const BinaryStreamable& dataObject, bool compress);
 
         /**
          * @brief

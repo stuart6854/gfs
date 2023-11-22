@@ -81,21 +81,21 @@ int main()
     assert(!fs.IsPathInAnyMount(".././some_other_file.txt"));
 
     DataType data{ 5, 3.1415f, true };
-    if (!fs.WriteFile(mountA, "file.rbin", 234598753, data, false))
+    if (!fs.WriteFile(mountA, "file.rbin", 234598753, {}, data, false))
         assert(false);
 
     TextResource texResource{};
     texResource.Text = ReadTextFile("external_files/txt_file.txt");
-    if (!fs.WriteFile(mountA, "aa/txt_file.rbin", 67236784, texResource, false))
+    if (!fs.WriteFile(mountA, "aa/txt_file.rbin", 67236784, {}, texResource, false))
         assert(false);
 
     TextResource texResourceBigger{};
     for (auto i = 0; i < 1000; ++i)
         texResourceBigger.Text += texResource.Text;
-    if (!fs.WriteFile(mountB, "txt_file_bigger.rbin", 68923789324, texResourceBigger, false))
+    if (!fs.WriteFile(mountB, "txt_file_bigger.rbin", 68923789324, {}, texResourceBigger, false))
         assert(false);
 
-    if (!fs.WriteFile(mountB, "txt_file_bigger_compressed.rbin", 8367428478, texResourceBigger, true))
+    if (!fs.WriteFile(mountB, "txt_file_bigger_compressed.rbin", 8367428478, {}, texResourceBigger, true))
         assert(false);
 
     std::cout << "Files" << std::endl;
