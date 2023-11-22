@@ -14,8 +14,11 @@ jobs:
     steps:
     - name: Checkout repo code
       uses: actions/checkout@v3
-    - name: configure
-      run: ./GenerateProj_GMake2
+    - name: Generate GMake project files
+      run: |
+        chmod +x ./GenerateProj_GMake2.sh
+        ./GenerateProj_GMake2.sh
+      shell: bash
     - name: make
       run: make
     - name: make check
