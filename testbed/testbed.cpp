@@ -20,10 +20,11 @@ auto ReadTextFile(const std::filesystem::path& filename) -> std::string
 
 struct DataType : gfs::BinaryStreamable
 {
-    uint32_t value_a;
-    float value_b;
-    bool value_c;
+    uint32_t value_a = 0;
+    float value_b = 0.0f;
+    bool value_c = false;
 
+    DataType() = default;
     DataType(uint32_t a, float b, bool c) : value_a(a), value_b(b), value_c(c) {}
 
     void Read(gfs::BinaryStreamRead& stream) override
@@ -80,25 +81,43 @@ int main()
     assert(!fs.IsPathInAnyMount(".././some_other_file.txt"));
 
     DataType data{ 5, 3.1415f, true };
-    fs.WriteFile("mount_a/file.rbin", 234598753, data, false);
+    if (!fs.WriteFile(mountA, "file.rbin", 234598753, data, false))
+        assert(false);
 
     TextResource texResource{};
     texResource.Text = ReadTextFile("external_files/txt_file.txt");
-    if (!fs.WriteFile("mount_a/aa/txt_file.rbin", 67236784, texResource, false))
+    if (!fs.WriteFile(mountA, "aa/txt_file.rbin", 67236784, texResource, false))
         assert(false);
 
     TextResource texResourceBigger{};
     for (auto i = 0; i < 1000; ++i)
         texResourceBigger.Text += texResource.Text;
-    if (!fs.WriteFile("mount_b_locked/txt_file_bigger.rbin", 68923789324, texResourceBigger, false))
+    if (!fs.WriteFile(mountB, "txt_file_bigger.rbin", 68923789324, texResourceBigger, false))
         assert(false);
-    if (!fs.WriteFile("mount_b_locked/txt_file_bigger_compressed.rbin", 8367428478, texResourceBigger, true))
+
+    if (!fs.WriteFile(mountB, "txt_file_bigger_compressed.rbin", 8367428478, texResourceBigger, true))
         assert(false);
 
     std::cout << "Files" << std::endl;
     fs.ForEachFile([](const gfs::Filesystem::File& file) {
         std::cout << "- " << file.FileId << " - " << file.MountRelPath << std::endl;
         });
+
+    DataType readData{};
+    if (!fs.ReadFile(234598753, readData))
+        assert(false);
+
+    assert(data.value_a == readData.value_a && data.value_b && readData.value_b && data.value_c == readData.value_c);
+
+    TextResource readTexResourceUncompressed{};
+    if (!fs.ReadFile(68923789324, readTexResourceUncompressed))
+        assert(false);
+    assert(readTexResourceUncompressed.Text == texResourceBigger.Text);
+
+    TextResource readTexResourceCompressed{};
+    if (!fs.ReadFile(8367428478, readTexResourceCompressed))
+        assert(false);
+    assert(readTexResourceCompressed.Text == texResourceBigger.Text);
 
     return 0;
 }

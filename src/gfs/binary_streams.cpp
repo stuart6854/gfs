@@ -2,63 +2,6 @@
 
 namespace gfs
 {
-    BinaryStreamRead::BinaryStreamRead(const std::filesystem::path& filename)
-    {
-        m_stream = std::ifstream(filename, std::ios::binary);
-        m_stream.unsetf(std::ios_base::skipws);
-    }
-
-    BinaryStreamRead::~BinaryStreamRead()
-    {
-        Close();
-    }
-
-    void BinaryStreamRead::Close()
-    {
-        m_stream.clear();
-    }
-
-    auto BinaryStreamRead::TellG() -> uint64_t
-    {
-        return uint64_t(m_stream.tellg());
-    }
-
-    void BinaryStreamRead::SeekG(uint64_t pos, bool fromEnd)
-    {
-        m_stream.seekg(pos, fromEnd ? std::ios::end : std::ios::beg);
-    }
-
-    void BinaryStreamRead::Read(BinaryStreamable& value)
-    {
-        value.Read(*this);
-    }
-
-    auto BinaryStreamRead::Read(uint64_t size) -> std::vector<uint8_t>
-    {
-        std::vector<uint8_t> buffer(size);
-        m_stream.read(reinterpret_cast<char*>(buffer.data()), size);
-        return buffer;
-    }
-
-    void BinaryStreamRead::Read(uint64_t size, void* data)
-    {
-        m_stream.read(reinterpret_cast<char*>(data), size);
-    }
-
-    template<>
-    void BinaryStreamRead::Read<std::string>(std::string& value)
-    {
-        uint32_t strSize = 0;
-        m_stream.read(reinterpret_cast<char*>(&strSize), sizeof(strSize));
-        value.resize(strSize, char(0));
-        m_stream.read(value.data(), sizeof(char) * strSize);
-    }
-
-    BinaryStreamRead::operator bool() const
-    {
-        return bool(m_stream);
-    }
-
     BinaryStreamWrite::BinaryStreamWrite(const std::filesystem::path& filename)
     {
         m_stream = std::ofstream(filename, std::ios::binary);
@@ -104,6 +47,67 @@ namespace gfs
     }
 
     BinaryStreamWrite::operator bool() const
+    {
+        return bool(m_stream);
+    }
+
+    BinaryStreamRead::BinaryStreamRead(const uint8_t* p, size_t l) : m_stream(p, l)
+    {
+        m_stream.unsetf(std::ios_base::skipws);
+    }
+
+    BinaryStreamRead::~BinaryStreamRead()
+    {
+        Close();
+    }
+
+    void BinaryStreamRead::Close()
+    {
+        m_stream.clear();
+    }
+
+    auto BinaryStreamRead::TellG() -> uint64_t
+    {
+        return uint64_t(m_stream.tellg());
+    }
+
+    void BinaryStreamRead::SeekG(uint64_t pos, bool fromEnd)
+    {
+        m_stream.seekg(pos, fromEnd ? std::ios::end : std::ios::beg);
+    }
+
+    void BinaryStreamRead::Ignore(uint64_t size)
+    {
+        m_stream.ignore(size);
+    }
+
+    void BinaryStreamRead::Read(BinaryStreamable& value)
+    {
+        value.Read(*this);
+    }
+
+    auto BinaryStreamRead::Read(uint64_t size) -> std::vector<uint8_t>
+    {
+        std::vector<uint8_t> buffer(size);
+        m_stream.read(reinterpret_cast<char*>(buffer.data()), size);
+        return buffer;
+    }
+
+    void BinaryStreamRead::Read(uint64_t size, void* data)
+    {
+        m_stream.read(reinterpret_cast<char*>(data), size);
+    }
+
+    template<>
+    void BinaryStreamRead::Read<std::string>(std::string& value)
+    {
+        uint32_t strSize = 0;
+        m_stream.read(reinterpret_cast<char*>(&strSize), sizeof(strSize));
+        value.resize(strSize, char(0));
+        m_stream.read(value.data(), sizeof(char) * strSize);
+    }
+
+    BinaryStreamRead::operator bool() const
     {
         return bool(m_stream);
     }

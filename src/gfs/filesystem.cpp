@@ -11,6 +11,8 @@ namespace gfs
     constexpr char FS_FORMAT_MAGIC_NUM[4] = { 'g','f' ,'s' ,'f' }; // GFS Format
     constexpr auto FS_FORMAT_VERSION = 1;
 
+    constexpr uint32_t FS_FORMAT_PATH_LENGTH = 255;
+
     auto Filesystem::MountDir(const std::filesystem::path& rootDir, bool allowUnmount) -> MountID
     {
         if (!std::filesystem::exists(rootDir))
@@ -166,50 +168,57 @@ namespace gfs
 
     void Filesystem::ValidateAndRegisterFile(const std::filesystem::path& filename, MountID mountId)
     {
-        BinaryStreamRead stream(filename);
+        std::ifstream stream(filename, std::ios::binary);
         if (!stream)
             return;
 
         FormatHeader header{};
-        stream.Read(header);
+        stream >> header;
 
         if (std::memcmp(header.MagicNumber, FS_FORMAT_MAGIC_NUM, sizeof(header.MagicNumber)) != 0)
             return;
 
         File file{};
-        stream.Read(file);
+        stream >> file;
 
         file.MountId = mountId;
         file.MountRelPath = filename;
         m_files[file.FileId] = file;
     }
 
-    bool Filesystem::WriteFile(const std::filesystem::path& filename, FileID fileId, const BinaryStreamable& dataObject, bool compress)
+    bool Filesystem::WriteFile(MountID mountId, const std::filesystem::path& filename, FileID fileId, const BinaryStreamable& dataObject, bool compress)
     {
-        const auto tempBinaryFile = filename.string() + ".tmp";
+        auto* mount = GetMount(mountId);
+        if (!mount)
+            return false;
+
+        const auto tempBinaryFile = mount->RootDirPath / (filename.string() + ".tmp");
 
         BinaryStreamWrite tempFileStream(tempBinaryFile);
         if (!tempFileStream)
             return false;
 
         tempFileStream.Write(dataObject);
-        const auto binaryDataSize = tempFileStream.TellP();
         tempFileStream.Close();
 
-        BinaryStreamWrite stream(filename);
+        BinaryStreamWrite stream(mount->RootDirPath / filename);
         if (!stream)
             return false;
 
-        BinaryStreamRead dataStream(tempBinaryFile);
+        std::ifstream dataStream(tempBinaryFile, std::ios::binary | std::ios::ate);
         if (!dataStream)
             return false;
 
-        auto uncompressedDataBuffer = dataStream.Read(binaryDataSize);
-        dataStream.Close();
+        const auto dataSize = uint32_t(dataStream.tellg());
+        dataStream.seekg(0, std::ios::beg);
+        std::vector<uint8_t> uncompressedDataBuffer(dataSize);
+        dataStream.read(reinterpret_cast<char*>(uncompressedDataBuffer.data()), dataSize);
+        dataStream.close();
 
         File file{};
         file.FileId = fileId;
-        file.MountId = GetMountPathIsIn(filename);
+        file.MountId = mountId;
+        file.MountRelPath = filename;
         file.FileDependencies = {};
 
         std::vector<uint8_t> compressedDataBuffer;
@@ -240,14 +249,14 @@ namespace gfs
 
         stream.Write(header);
         stream.Write(file);
-        const uint32_t dataOffset = uint32_t(stream.TellP());
-        const uint32_t offsetPos = dataOffset - sizeof(file.Offset);
+        file.Offset = uint32_t(stream.TellP());
+        const uint32_t offsetPos = file.Offset - sizeof(file.Offset);
 
         stream.Write(sizeof(uint8_t) * compressedDataBuffer.size(), compressedDataBuffer.data());
 
         // Go back and write data offset
         stream.SeekP(offsetPos, false);
-        stream.Write(dataOffset);
+        stream.Write(file.Offset);
 
         bool exists = std::filesystem::exists(tempBinaryFile);
         assert(exists);
@@ -272,36 +281,102 @@ namespace gfs
         return true;
     }
 
-    void FormatHeader::Read(BinaryStreamRead& stream)
+    bool Filesystem::ReadFile(FileID fileId, BinaryStreamable& dataObject)
     {
-        stream.Read(sizeof(MagicNumber), MagicNumber);
-        stream.Read(FormatVersion);
-        stream.Read(FileCount);
+        auto* file = GetFile(fileId);
+        if (!file)
+            return false;
+
+        auto* mount = GetMount(file->MountId);
+        if (!mount)
+            return false;
+
+        std::ifstream stream(mount->RootDirPath / file->MountRelPath, std::ios::binary);
+        stream.unsetf(std::ios_base::skipws);
+        stream.seekg(file->Offset);
+
+        const bool isCompressed = file->CompressedSize != file->UncompressedSize;
+
+        std::vector<uint8_t> bufferUncompressed(file->UncompressedSize);
+        std::vector<uint8_t> bufferCompressed(isCompressed ? file->CompressedSize : 0);
+
+        stream.read(reinterpret_cast<char*>(isCompressed ? bufferCompressed.data() : bufferUncompressed.data()), file->CompressedSize);
+        if (file->CompressedSize != file->UncompressedSize)
+        {
+            // Data is compressed.
+            int bytes = LZ4_decompress_safe(reinterpret_cast<const char*>(bufferCompressed.data()), reinterpret_cast<char*>(bufferUncompressed.data()), file->CompressedSize, file->UncompressedSize);
+
+            if (uint32_t(bytes) != file->UncompressedSize)
+                return false; // Did not decompress to original size.
+        }
+        else
+        {
+        }
+
+        BinaryStreamRead dataStream(bufferUncompressed.data(), bufferUncompressed.size());
+        dataObject.Read(dataStream);
+
+        return true;
     }
 
-    void FormatHeader::Write(BinaryStreamWrite& stream) const
+    auto operator<<(std::ostream& stream, const FormatHeader& header) -> std::ostream&
     {
-        stream.Write(sizeof(MagicNumber), MagicNumber);
-        stream.Write(FormatVersion);
-        stream.Write(FileCount);
+        stream.write(reinterpret_cast<const char*>(&header.MagicNumber), sizeof(header.MagicNumber));
+        stream.write(reinterpret_cast<const char*>(&header.FormatVersion), sizeof(header.FormatVersion));
+        stream.write(reinterpret_cast<const char*>(&header.FileCount), sizeof(header.FileCount));
+        return stream;
     }
 
-    void Filesystem::File::Read(BinaryStreamRead& stream)
+    auto operator>>(std::istream& stream, FormatHeader& header) -> std::istream&
     {
-        stream.Read(FileId);
-        stream.ReadVector(FileDependencies);
-        stream.Read(UncompressedSize);
-        stream.Read(CompressedSize);
-        stream.Read(Offset);
+        stream.read(reinterpret_cast<char*>(&header.MagicNumber), sizeof(header.MagicNumber));
+        stream.read(reinterpret_cast<char*>(&header.FormatVersion), sizeof(header.FormatVersion));
+        stream.read(reinterpret_cast<char*>(&header.FileCount), sizeof(header.FileCount));
+        return stream;
     }
 
-    void Filesystem::File::Write(BinaryStreamWrite& stream) const
+    auto operator<<(std::ostream& stream, const Filesystem::File& file) -> std::ostream&
     {
-        stream.Write(FileId);
-        stream.WriteVector(FileDependencies);
-        stream.Write(UncompressedSize);
-        stream.Write(CompressedSize);
-        stream.Write(Offset);
+        stream.write(reinterpret_cast<const char*>(&file.FileId), sizeof(file.FileId));
+
+        // Mount relative path
+        auto pathStr = file.MountRelPath.string();
+        pathStr.resize(FS_FORMAT_PATH_LENGTH);
+        stream.write(reinterpret_cast<const char*>(pathStr.data()), pathStr.size());
+
+        // File dependencies
+        const auto count = uint32_t(file.FileDependencies.size());
+        stream.write(reinterpret_cast<const char*>(&count), sizeof(count));
+        if (!file.FileDependencies.empty())
+            stream.write(reinterpret_cast<const char*>(file.FileDependencies.data()), sizeof(file.FileDependencies[0]) * count);
+
+        stream.write(reinterpret_cast<const char*>(&file.UncompressedSize), sizeof(file.UncompressedSize));
+        stream.write(reinterpret_cast<const char*>(&file.CompressedSize), sizeof(file.CompressedSize));
+        stream.write(reinterpret_cast<const char*>(&file.Offset), sizeof(file.Offset));
+        return stream;
+    }
+
+    auto operator>>(std::istream& stream, Filesystem::File& file) -> std::istream&
+    {
+        stream.read(reinterpret_cast<char*>(&file.FileId), sizeof(file.FileId));
+
+        // Mount relative path
+        std::string pathStr(FS_FORMAT_PATH_LENGTH, 0);
+        stream.read(reinterpret_cast<char*>(pathStr.data()), FS_FORMAT_PATH_LENGTH);
+        pathStr.erase(pathStr.find_last_not_of(char(0)) + 1, std::string::npos);
+        file.MountRelPath = pathStr;
+
+        // File dependencies
+        uint32_t count = 0;
+        stream.read(reinterpret_cast<char*>(&count), sizeof(count));
+        file.FileDependencies.resize(count);
+        if (!file.FileDependencies.empty())
+            stream.read(reinterpret_cast<char*>(file.FileDependencies.data()), sizeof(file.FileDependencies[0]) * count);
+
+        stream.read(reinterpret_cast<char*>(&file.UncompressedSize), sizeof(file.UncompressedSize));
+        stream.read(reinterpret_cast<char*>(&file.CompressedSize), sizeof(file.CompressedSize));
+        stream.read(reinterpret_cast<char*>(&file.Offset), sizeof(file.Offset));
+        return stream;
     }
 
 }

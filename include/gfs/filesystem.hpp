@@ -27,14 +27,14 @@ namespace gfs
 
     constexpr MountID InvalidMountId = 0;
 
-    struct FormatHeader : BinaryStreamable
+    struct FormatHeader
     {
         char MagicNumber[4];
         uint16_t FormatVersion;
         uint32_t FileCount;
 
-        void Read(BinaryStreamRead& stream) override;
-        void Write(BinaryStreamWrite& stream) const override;
+        friend auto operator<<(std::ostream& stream, const FormatHeader& header)->std::ostream&;
+        friend auto operator>>(std::istream& stream, FormatHeader& header)->std::istream&;
     };
 
     class Filesystem
@@ -86,7 +86,7 @@ namespace gfs
         // Files
         //////////////////////////////////////////////////////////////////////////
 
-        struct File : BinaryStreamable
+        struct File
         {
             FileID FileId; // The Unique Identifier of the file.
             MountID MountId; // The Id of the mount this file is in.
@@ -96,8 +96,8 @@ namespace gfs
             uint32_t CompressedSize;
             uint32_t Offset;
 
-            void Read(BinaryStreamRead& stream) override;
-            void Write(BinaryStreamWrite& stream) const override;
+            friend auto operator<<(std::ostream& stream, const File& header)->std::ostream&;
+            friend auto operator>>(std::istream& stream, File& header)->std::istream&;
         };
 
         /**
@@ -113,7 +113,23 @@ namespace gfs
         */
         void ForEachFile(const std::function<void(const File& file)>& func);
 
-        bool WriteFile(const std::filesystem::path& filename, FileID fileId, const BinaryStreamable& dataObject, bool compress);
+        /**
+         * @brief
+         * @param filename
+         * @param fileId
+         * @param dataObject
+         * @param compress
+         * @return
+        */
+        bool WriteFile(MountID mountId, const std::filesystem::path& filename, FileID fileId, const BinaryStreamable& dataObject, bool compress);
+
+        /**
+         * @brief
+         * @param fileId
+         * @param dataObject
+         * @return
+        */
+        bool ReadFile(FileID fileId, BinaryStreamable& dataObject);
 
         //////////////////////////////////////////////////////////////////////////
         // Import
