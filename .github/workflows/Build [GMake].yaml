@@ -1,4 +1,4 @@
-name: C/C++ CI
+name: Build GMake
 
 on:
   push:
@@ -16,6 +16,7 @@ jobs:
       uses: actions/checkout@v3
     - name: Generate GMake project files
       run: |
+        chmod +x ./vendor/premake/premake5
         chmod +x ./GenerateProj_GMake2.sh
         ./GenerateProj_GMake2.sh
       shell: bash
