@@ -27,18 +27,18 @@ struct DataType : gfs::BinaryStreamable
     DataType() = default;
     DataType(uint32_t a, float b, bool c) : value_a(a), value_b(b), value_c(c) {}
 
-    void Read(gfs::BinaryStreamRead& stream) override
+    void Read(gfs::ReadOnlyByteBuffer& buffer) override
     {
-        stream.Read(value_a);
-        stream.Read(value_b);
-        stream.Read(value_c);
+        buffer.Read(value_a);
+        buffer.Read(value_b);
+        buffer.Read(value_c);
     }
 
-    void Write(gfs::BinaryStreamWrite& stream) const override
+    void Write(gfs::WriteOnlyByteBuffer& buffer) const override
     {
-        stream.Write(value_a);
-        stream.Write(value_b);
-        stream.Write(value_c);
+        buffer.Write(value_a);
+        buffer.Write(value_b);
+        buffer.Write(value_c);
     }
 };
 
@@ -46,14 +46,14 @@ struct TextResource : gfs::BinaryStreamable
 {
     std::string Text;
 
-    void Read(gfs::BinaryStreamRead& stream) override
+    void Read(gfs::ReadOnlyByteBuffer& buffer) override
     {
-        stream.Read(Text);
+        buffer.Read(Text);
     }
 
-    void Write(gfs::BinaryStreamWrite& stream) const override
+    void Write(gfs::WriteOnlyByteBuffer& buffer) const override
     {
-        stream.Write(Text);
+        buffer.Write(Text);
     }
 };
 
@@ -84,14 +84,14 @@ int main()
     if (!fs.WriteFile(mountA, "file.rbin", 234598753, {}, data, false))
         assert(false);
 
-    TextResource texResource{};
-    texResource.Text = ReadTextFile("external_files/txt_file.txt");
-    if (!fs.WriteFile(mountA, "aa/txt_file.rbin", 67236784, {}, texResource, false))
+    TextResource shortText{};
+    shortText.Text = ReadTextFile("external_files/txt_file.txt");
+    if (!fs.WriteFile(mountA, "aa/txt_file.rbin", 67236784, {}, shortText, false))
         assert(false);
 
     TextResource texResourceBigger{};
     for (auto i = 0; i < 1000; ++i)
-        texResourceBigger.Text += texResource.Text;
+        texResourceBigger.Text += shortText.Text;
     if (!fs.WriteFile(mountB, "txt_file_bigger.rbin", 68923789324, {}, texResourceBigger, false))
         assert(false);
 
@@ -106,13 +106,17 @@ int main()
     DataType readData{};
     if (!fs.ReadFile(234598753, readData))
         assert(false);
-
     assert(data.value_a == readData.value_a && data.value_b && readData.value_b && data.value_c == readData.value_c);
+
+    TextResource readTextShort{};
+    if (!fs.ReadFile(67236784, readTextShort))
+        assert(false);
+    assert(strcmp(readTextShort.Text.c_str(), shortText.Text.c_str()) == 0);
 
     TextResource readTexResourceUncompressed{};
     if (!fs.ReadFile(68923789324, readTexResourceUncompressed))
         assert(false);
-    assert(readTexResourceUncompressed.Text == texResourceBigger.Text);
+    assert(strcmp(readTexResourceUncompressed.Text.c_str(), texResourceBigger.Text.c_str()) == 0);
 
     TextResource readTexResourceCompressed{};
     if (!fs.ReadFile(8367428478, readTexResourceCompressed))

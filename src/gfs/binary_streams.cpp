@@ -1,115 +1,108 @@
 #include "gfs/binary_streams.hpp"
 
+#include <cstring>
+
 namespace gfs
 {
-    BinaryStreamWrite::BinaryStreamWrite(const std::filesystem::path& filename)
+    static auto NextPowerOf2(uint64_t value) -> uint64_t
     {
-        m_stream = std::ofstream(filename, std::ios::binary);
-        m_stream.unsetf(std::ios_base::skipws);
+        value--;
+        value |= value >> 1;
+        value |= value >> 2;
+        value |= value >> 4;
+        value |= value >> 8;
+        value |= value >> 16;
+        value |= value >> 32;
+        value++;
+        return value;
     }
 
-    BinaryStreamWrite::~BinaryStreamWrite()
+    ReadOnlyByteBuffer::ReadOnlyByteBuffer(uint64_t size)
+        : m_buffer(new uint8_t[size]),
+        m_size(size),
+        m_position(0)
     {
-        Close();
     }
 
-    void BinaryStreamWrite::Close()
+    ReadOnlyByteBuffer::~ReadOnlyByteBuffer()
     {
-        m_stream.close();
+        delete[] m_buffer;
     }
 
-    auto BinaryStreamWrite::TellP() -> uint64_t
+    void ReadOnlyByteBuffer::Read(uint64_t size, uint8_t* data)
     {
-        return uint64_t(m_stream.tellp());
-    }
-
-    void BinaryStreamWrite::SeekP(uint64_t pos, bool fromEnd)
-    {
-        m_stream.seekp(pos, fromEnd ? std::ios::end : std::ios::beg);
-    }
-
-    void BinaryStreamWrite::Write(const BinaryStreamable& value)
-    {
-        value.Write(*this);
-    }
-
-    void BinaryStreamWrite::Write(uint64_t size, const void* data)
-    {
-        m_stream.write(reinterpret_cast<const char*>(data), size);
+        std::memcpy(data, m_buffer + m_position, size);
+        m_position += size;
     }
 
     template<>
-    void BinaryStreamWrite::Write<std::string>(const std::string& value)
+    void ReadOnlyByteBuffer::Read(std::string& value)
     {
-        auto strSize = uint32_t(value.size());
-        m_stream.write(reinterpret_cast<const char*>(&strSize), sizeof(strSize));
-        m_stream.write(value.data(), sizeof(char) * strSize);
+        uint64_t strLen = 0;
+        Read(strLen);
+        value.resize(strLen, char(0));
+        Read(sizeof(std::string::value_type) * strLen, reinterpret_cast<uint8_t*>(value.data()));
     }
 
-    BinaryStreamWrite::operator bool() const
+    WriteOnlyByteBuffer::WriteOnlyByteBuffer(uint64_t initialCapacity)
+        : m_buffer(new uint8_t[initialCapacity]),
+        m_capacity(initialCapacity),
+        m_size(0),
+        m_position(0)
     {
-        return bool(m_stream);
     }
 
-    BinaryStreamRead::BinaryStreamRead(const uint8_t* p, size_t l) : m_stream(p, l)
+    WriteOnlyByteBuffer::~WriteOnlyByteBuffer()
     {
-        m_stream.unsetf(std::ios_base::skipws);
+        delete[] m_buffer;
     }
 
-    BinaryStreamRead::~BinaryStreamRead()
+    void WriteOnlyByteBuffer::SetCapacity(uint64_t newCapacity)
     {
-        Close();
+        if (newCapacity <= newCapacity)
+            return;
+
+        uint8_t* newBuffer = new uint8_t[newCapacity];
+        std::memcpy(newBuffer, m_buffer, m_size);
+        delete[] m_buffer;
+
+        m_buffer = newBuffer;
+        m_capacity = newCapacity;
     }
 
-    void BinaryStreamRead::Close()
+    void WriteOnlyByteBuffer::SetSize(uint64_t newSize)
     {
-        m_stream.clear();
+        if (newSize > m_capacity)
+            SetCapacity(newSize);
+
+        m_size = newSize;
+        if (m_position > m_size)
+            m_position = m_size;
     }
 
-    auto BinaryStreamRead::TellG() -> uint64_t
+    void WriteOnlyByteBuffer::SetPosition(uint64_t pos)
     {
-        return uint64_t(m_stream.tellg());
+        m_position = pos;
     }
 
-    void BinaryStreamRead::SeekG(uint64_t pos, bool fromEnd)
+    void WriteOnlyByteBuffer::Write(uint64_t size, const uint8_t* data)
     {
-        m_stream.seekg(pos, fromEnd ? std::ios::end : std::ios::beg);
-    }
+        if (m_position + size > m_capacity)
+            SetCapacity(NextPowerOf2(m_capacity));
 
-    void BinaryStreamRead::Ignore(uint64_t size)
-    {
-        m_stream.ignore(size);
-    }
+        std::memcpy(&m_buffer[m_position], data, size);
 
-    void BinaryStreamRead::Read(BinaryStreamable& value)
-    {
-        value.Read(*this);
-    }
-
-    auto BinaryStreamRead::Read(uint64_t size) -> std::vector<uint8_t>
-    {
-        std::vector<uint8_t> buffer(size);
-        m_stream.read(reinterpret_cast<char*>(buffer.data()), size);
-        return buffer;
-    }
-
-    void BinaryStreamRead::Read(uint64_t size, void* data)
-    {
-        m_stream.read(reinterpret_cast<char*>(data), size);
+        m_position += size;
+        if (m_position > m_size)
+            m_size = m_position;
     }
 
     template<>
-    void BinaryStreamRead::Read<std::string>(std::string& value)
+    void WriteOnlyByteBuffer::Write(const std::string& value)
     {
-        uint32_t strSize = 0;
-        m_stream.read(reinterpret_cast<char*>(&strSize), sizeof(strSize));
-        value.resize(strSize, char(0));
-        m_stream.read(value.data(), sizeof(char) * strSize);
-    }
-
-    BinaryStreamRead::operator bool() const
-    {
-        return bool(m_stream);
+        uint64_t strLen = value.size();
+        Write(strLen);
+        Write(sizeof(std::string::value_type) * strLen, reinterpret_cast<const uint8_t*>(value.data()));
     }
 
 }

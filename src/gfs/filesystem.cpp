@@ -193,89 +193,56 @@ namespace gfs
         if (!mount)
             return false;
 
-        const auto tempBinaryFile = mount->RootDirPath / (filename.string() + ".tmp");
+        WriteOnlyByteBuffer uncompressedDataBuffer;
+        dataObject.Write(uncompressedDataBuffer);
 
-        BinaryStreamWrite tempFileStream(tempBinaryFile);
-        if (!tempFileStream)
-            return false;
-
-        tempFileStream.Write(dataObject);
-        tempFileStream.Close();
-
-        BinaryStreamWrite stream(mount->RootDirPath / filename);
-        if (!stream)
-            return false;
-
-        std::ifstream dataStream(tempBinaryFile, std::ios::binary | std::ios::ate);
-        if (!dataStream)
-            return false;
-
-        const auto dataSize = uint32_t(dataStream.tellg());
-        dataStream.seekg(0, std::ios::beg);
-        std::vector<uint8_t> uncompressedDataBuffer(dataSize);
-        dataStream.read(reinterpret_cast<char*>(uncompressedDataBuffer.data()), dataSize);
-        dataStream.close();
-
-        File file{};
-        file.FileId = fileId;
-        file.MountId = mountId;
-        file.MountRelPath = filename;
-        file.FileDependencies = fileDependencies;
-
-        std::vector<uint8_t> compressedDataBuffer;
-        file.UncompressedSize = uint32_t(uncompressedDataBuffer.size());
+        WriteOnlyByteBuffer compressedDataBuffer;
         if (compress)
         {
-            compressedDataBuffer.resize(uncompressedDataBuffer.size());
+            compressedDataBuffer.SetSize(uncompressedDataBuffer.GetSize());
             const uint32_t compressedSize = LZ4_compress_default(
-                reinterpret_cast<const char*>(uncompressedDataBuffer.data()),
-                reinterpret_cast<char*>(compressedDataBuffer.data()),
-                int32_t(uncompressedDataBuffer.size()),
-                int32_t(compressedDataBuffer.size())
+                reinterpret_cast<const char*>(uncompressedDataBuffer.GetData()),
+                reinterpret_cast<char*>(compressedDataBuffer.GetData()),
+                int32_t(uncompressedDataBuffer.GetSize()),
+                int32_t(compressedDataBuffer.GetSize())
             );
-            compressedDataBuffer.resize(compressedSize);
-            file.CompressedSize = compressedSize;
+            compressedDataBuffer.SetSize(compressedSize);
         }
         else
         {
-            compressedDataBuffer = uncompressedDataBuffer;
-            file.CompressedSize = file.UncompressedSize;
+            compressedDataBuffer.SetSize(uncompressedDataBuffer.GetSize());
+            compressedDataBuffer.Write(uncompressedDataBuffer.GetSize(), uncompressedDataBuffer.GetData());
         }
-        uncompressedDataBuffer.clear();
 
         FormatHeader header{};
         std::memcpy(header.MagicNumber, FS_FORMAT_MAGIC_NUM, sizeof(FS_FORMAT_MAGIC_NUM));
         header.FormatVersion = FS_FORMAT_VERSION;
         header.FileCount = 1;
 
-        stream.Write(header);
-        stream.Write(file);
-        file.Offset = uint32_t(stream.TellP());
+        File file{};
+        file.FileId = fileId;
+        file.MountId = mountId;
+        file.MountRelPath = filename;
+        file.FileDependencies = fileDependencies;
+        file.UncompressedSize = uint32_t(uncompressedDataBuffer.GetSize());
+        file.CompressedSize = uint32_t(compressedDataBuffer.GetSize());
+
+        std::ofstream stream(mount->RootDirPath / filename, std::ios::binary);
+        if (!stream)
+            return false;
+
+        stream.unsetf(std::ios::skipws);
+
+        stream << header;
+        stream << file;
+        file.Offset = uint32_t(stream.tellp());
         const uint32_t offsetPos = file.Offset - sizeof(file.Offset);
 
-        stream.Write(sizeof(uint8_t) * compressedDataBuffer.size(), compressedDataBuffer.data());
+        stream.write(reinterpret_cast<const char*>(compressedDataBuffer.GetData()), compressedDataBuffer.GetSize());
 
         // Go back and write data offset
-        stream.SeekP(offsetPos, false);
-        stream.Write(file.Offset);
-
-        bool exists = std::filesystem::exists(tempBinaryFile);
-        assert(exists);
-
-        std::filesystem::remove(tempBinaryFile); // #ERROR: This is throwing for some reason.
-        //try
-        //{
-        //    std::filesystem::remove(tempBinaryFile); // #ERROR: This is throwing for some reason.
-        //}
-        //catch (std::filesystem::filesystem_error const& ex)
-        //{
-        //    std::cout << "what():  " << ex.what() << '\n'
-        //        << "path1(): " << ex.path1() << '\n'
-        //        << "path2(): " << ex.path2() << '\n'
-        //        << "code().value():    " << ex.code().value() << '\n'
-        //        << "code().message():  " << ex.code().message() << '\n'
-        //        << "code().category(): " << ex.code().category().name() << '\n';
-        //}
+        stream.seekp(offsetPos, false);
+        stream.write(reinterpret_cast<const char*>(&file.Offset), sizeof(file.Offset));
 
         m_files[file.FileId] = file; // Register new file.
 
@@ -293,29 +260,26 @@ namespace gfs
             return false;
 
         std::ifstream stream(mount->RootDirPath / file->MountRelPath, std::ios::binary);
-        stream.unsetf(std::ios_base::skipws);
+        stream.unsetf(std::ios::skipws);
         stream.seekg(file->Offset);
 
         const bool isCompressed = file->CompressedSize != file->UncompressedSize;
 
-        std::vector<uint8_t> bufferUncompressed(file->UncompressedSize);
-        std::vector<uint8_t> bufferCompressed(isCompressed ? file->CompressedSize : 0);
+        ReadOnlyByteBuffer decompressedBuffer(file->UncompressedSize);
+        ReadOnlyByteBuffer compressedBuffer(isCompressed ? file->CompressedSize : 0);
 
-        stream.read(reinterpret_cast<char*>(isCompressed ? bufferCompressed.data() : bufferUncompressed.data()), file->CompressedSize);
-        if (file->CompressedSize != file->UncompressedSize)
+        stream.read(reinterpret_cast<char*>(isCompressed ? compressedBuffer.GetData() : decompressedBuffer.GetData()), file->CompressedSize);
+        if (isCompressed)
         {
-            // Data is compressed.
-            int bytes = LZ4_decompress_safe(reinterpret_cast<const char*>(bufferCompressed.data()), reinterpret_cast<char*>(bufferUncompressed.data()), file->CompressedSize, file->UncompressedSize);
+            const auto* srcPtr = reinterpret_cast<const char*>(compressedBuffer.GetData());
+            auto* dstPtr = reinterpret_cast<char*>(decompressedBuffer.GetData());
+            int bytes = LZ4_decompress_safe(srcPtr, dstPtr, int32_t(compressedBuffer.GetSize()), int32_t(decompressedBuffer.GetSize()));
 
             if (uint32_t(bytes) != file->UncompressedSize)
                 return false; // Did not decompress to original size.
         }
-        else
-        {
-        }
 
-        BinaryStreamRead dataStream(bufferUncompressed.data(), bufferUncompressed.size());
-        dataObject.Read(dataStream);
+        dataObject.Read(decompressedBuffer);
 
         return true;
     }
