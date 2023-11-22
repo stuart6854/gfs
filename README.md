@@ -27,6 +27,7 @@ Clone project and run the following to generate project files:
 ./GenerateProj_GMake2.sh
 ```
 
+### Example
 ```c++
 gfs::Filesystem fs;
 
