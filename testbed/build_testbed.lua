@@ -22,7 +22,7 @@ project "Testbed"
     {
         "GFS",
         -- LZ4
-        "liblz4_static"
+        "lz4"
     }
 
     targetdir("..bin/" .. OutputDir .. "/%{prj.name}")
