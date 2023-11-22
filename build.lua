@@ -16,3 +16,4 @@ workspace "gfs"
         include "testbed/build_testbed.lua"
 
     group "Benchmarks"
+        include "benchmarks/build_benchmark.lua"
