@@ -3,6 +3,10 @@
 .vscode/
 .idea/
 *.user
+*.sln
+*.vcxproj
+Makefile
+*.make
 
 # Build
 bin/
