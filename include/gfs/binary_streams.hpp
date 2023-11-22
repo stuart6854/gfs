@@ -74,6 +74,7 @@ namespace gfs
     class MemBuf : public std::basic_streambuf<char>
     {
     public:
+        MemBuf() = default;
         MemBuf(const uint8_t* p, size_t l)
         {
             setg((char*)p, (char*)p, (char*)p + l);
@@ -83,6 +84,7 @@ namespace gfs
     class MemStream : public std::istream
     {
     public:
+        MemStream() = default;
         MemStream(const uint8_t* p, size_t l) : std::istream(&m_buffer), m_buffer(p, l)
         {
             rdbuf(&m_buffer);
