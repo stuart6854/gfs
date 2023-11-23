@@ -241,7 +241,7 @@ namespace gfs
         stream.write(reinterpret_cast<const char*>(compressedDataBuffer.GetData()), compressedDataBuffer.GetSize());
 
         // Go back and write data offset
-        stream.seekp(offsetPos, false);
+        stream.seekp(offsetPos, std::ios::beg);
         stream.write(reinterpret_cast<const char*>(&file.Offset), sizeof(file.Offset));
 
         m_files[file.FileId] = file; // Register new file.
