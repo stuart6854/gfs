@@ -1,5 +1,8 @@
 # GFS - Game (Virtual) Filesystem
 
+[![Build Windows](https://github.com/stuart6854/gfs/actions/workflows/windows_build.yml/badge.svg?branch=main)](https://github.com/stuart6854/gfs/actions/workflows/windows_build.yml)
+[![Build Linux](https://github.com/stuart6854/gfs/actions/workflows/linux_build.yaml/badge.svg?branch=main)](https://github.com/stuart6854/gfs/actions/workflows/linux_build.yaml)
+
 ## Introduction
 
 A (virtual) filesystem designed to be used by games and game engines.
