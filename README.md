@@ -74,7 +74,6 @@ bool wasRead = fs.ReadFile(newFileId, dataObj);
 ## Planned Features
 
 - Add data compression threshold eg. only compress data greater than ~0.5MB
-- Currently write data to temp file to get binary size. Neeed to see if it is faster to write binary data to a vector instead
 - Archive files - Combine multiple (existing) files into a single archive file
 - File importing - Call Filesystem::ImportFile(filename) which gets a FileImporter assigned to file ext and reads, processes and writes a new file
     - Files that were imported track the source filename - allows for reimport, which would potentially allow for asset/resource hot-reloading
