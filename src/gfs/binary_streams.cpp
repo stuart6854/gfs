@@ -59,7 +59,7 @@ namespace gfs
 
     void WriteOnlyByteBuffer::SetCapacity(uint64_t newCapacity)
     {
-        if (newCapacity <= newCapacity)
+        if (newCapacity <= m_capacity)
             return;
 
         uint8_t* newBuffer = new uint8_t[newCapacity];
