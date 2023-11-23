@@ -1,4 +1,3 @@
-
 #include <gfs/gfs.hpp>
 
 #include <cassert>
@@ -7,6 +6,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <string.h>
 
 auto ReadTextFile(const std::filesystem::path& filename) -> std::string
 {
