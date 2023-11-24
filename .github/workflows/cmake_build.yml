@@ -28,7 +28,7 @@ jobs:
         include:
           - os: windows-latest
             cpp_compiler: cl
-          - os: ubunut-latest
+          - os: ubuntu-latest
             cpp_compiler: g++
           - os: ubuntu-latest
             cpp_compiler: clang++
