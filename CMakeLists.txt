@@ -25,7 +25,7 @@ set_target_properties(gfs PROPERTIES
     CXX_STANDARD_REQUIRED ON
     CXX_EXTENSIONS OFF
 )
-target_link_directories(gfs PRIVATE lz4_static)
+target_link_libraries(gfs PRIVATE lz4_static)
 
 if(${GFS_BUILD_TESTS})
     message(STATUS "Building testbed")
@@ -33,6 +33,6 @@ if(${GFS_BUILD_TESTS})
 endif()
 
 if(${GFS_BUILD_BENCHMARK})
-    message(STATUS "Building benchmarks")
-    add_subdirectory(benchmarks)
+    message(STATUS "Building benchmark")
+    add_subdirectory(benchmark)
 endif()
