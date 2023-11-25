@@ -1,11 +1,14 @@
 #include "gfs/filesystem.hpp"
+#include "gfs/binary_streams.hpp"
 
+#include <cstdint>
 #include <lz4.h>
 
 #include <cassert>
 #include <fstream>
 #include <iostream>
 #include <cstring>
+#include <vector>
 
 namespace gfs
 {
@@ -64,7 +67,7 @@ namespace gfs
 			func(mount);
 	}
 
-	auto Filesystem::GetFile(FileID id) -> const File*
+	auto Filesystem::GetFile(FileID id) const -> const File*
 	{
 		const auto it = m_files.find(id);
 		if (it == m_files.end())
@@ -77,114 +80,6 @@ namespace gfs
 	{
 		for (const auto& [id, file] : m_files)
 			func(file);
-	}
-
-	void Filesystem::SetImporter(const std::vector<std::string>& fileExts, const std::shared_ptr<FileImporter>& importer)
-	{
-		for (const auto& ext : fileExts)
-		{
-			const auto extHash = std::hash<std::string>{}(ext);
-			m_extImporterMap[extHash] = importer;
-		}
-	}
-
-	auto Filesystem::GetImporter(const std::string& fileExt) -> std::shared_ptr<FileImporter>
-	{
-		const auto extHash = std::hash<std::string>{}(fileExt);
-		const auto it = m_extImporterMap.find(extHash);
-		if (it == m_extImporterMap.end())
-			return nullptr;
-
-		return it->second;
-	}
-
-	bool Filesystem::IsPathInMount(const std::filesystem::path& path, MountID mountId)
-	{
-		auto* mount = GetMount(mountId);
-		if (!mount)
-			return false;
-
-		std::filesystem::path finalPath;
-		try
-		{
-			finalPath = std::filesystem::canonical(mount->RootDirPath / path);
-		}
-		catch (const std::exception& /*ex*/)
-		{
-			return false; // Path/File does not exists.
-		}
-
-		auto [rootEnd, nothing] = std::mismatch(mount->RootDirPath.begin(), mount->RootDirPath.end(), finalPath.begin());
-		if (rootEnd == mount->RootDirPath.end())
-			return false;
-
-		return true;
-	}
-
-	bool Filesystem::IsPathInAnyMount(const std::filesystem::path& path)
-	{
-		for (const auto& [id, mount] : m_mountMap)
-		{
-			if (IsPathInMount(path, mount.Id))
-				return true;
-		}
-		return false;
-	}
-
-	auto Filesystem::GetMount(MountID id) -> Mount*
-	{
-		const auto it = m_mountMap.find(id);
-		if (it == m_mountMap.end())
-			return nullptr;
-
-		return &it->second;
-	}
-
-	auto Filesystem::GetMountPathIsIn(const std::filesystem::path& path) -> MountID
-	{
-		for (auto& [id, mount] : m_mountMap)
-		{
-			if (IsPathInMount(path, id))
-				return id;
-		}
-		return InvalidMountId;
-	}
-
-	void Filesystem::GatherFilesInMount(const Mount& mount)
-	{
-		for (const auto& dirEntry : std::filesystem::recursive_directory_iterator(mount.RootDirPath))
-		{
-			if (!dirEntry.is_regular_file())
-				continue;
-
-			const auto filePath = dirEntry.path();
-
-			const auto fileSize = std::filesystem::file_size(filePath);
-			if (fileSize < sizeof(FormatHeader))
-				continue;
-
-			ValidateAndRegisterFile(filePath, mount.Id);
-		}
-	}
-
-	void Filesystem::ValidateAndRegisterFile(const std::filesystem::path& filename, MountID mountId)
-	{
-		std::ifstream stream(filename, std::ios::binary);
-		if (!stream)
-			return;
-
-		FormatHeader header{};
-		stream >> header;
-
-		if (std::memcmp(header.MagicNumber, FS_FORMAT_MAGIC_NUM, sizeof(header.MagicNumber)) != 0)
-			return;
-
-		File file{};
-		stream >> file;
-
-		file.MountId = mountId;
-		file.MountRelPath = filename;
-		m_files[file.FileId] = file;
 	}
 
 	bool Filesystem::WriteFile(MountID mountId,
@@ -287,6 +182,207 @@ namespace gfs
 		return true;
 	}
 
+	bool Filesystem::CreateArchive(MountID mountId, const std::filesystem::path& filename, const std::vector<FileID>& files)
+	{
+		auto* mount = GetMount(mountId);
+		if (!mount)
+			return false;
+
+		// Calculate total data size & data offsets
+		uint64_t totalDataSize = 0;
+		std::vector<uint64_t> fileDataOffsets(files.size());
+		for (auto i = 0; i < files.size(); ++i)
+		{
+			const auto fileId = files[i];
+			const auto* file = GetFile(fileId);
+			if (!file)
+				return false;
+
+			fileDataOffsets[i] = totalDataSize;
+			totalDataSize += file->CompressedSize;
+		}
+
+		// Gather file data
+		ReadOnlyByteBuffer dataBuffer(totalDataSize);
+		for (auto i = 0; i < files.size(); ++i)
+		{
+			const auto fileId = files[i];
+			const auto* file = GetFile(fileId);
+			if (!file)
+				return false;
+
+			auto* dataWriteOffset = static_cast<uint8_t*>(dataBuffer.GetData()) + fileDataOffsets[i];
+
+			std::ifstream stream(mount->RootDirPath / file->MountRelPath, std::ios::binary);
+			stream.unsetf(std::ios::skipws);
+			stream.seekg(file->Offset);
+			stream.read(reinterpret_cast<char*>(dataWriteOffset), file->CompressedSize);
+		}
+
+		FormatHeader header{};
+		std::memcpy(header.MagicNumber, FS_FORMAT_MAGIC_NUM, sizeof(FS_FORMAT_MAGIC_NUM));
+		header.FormatVersion = FS_FORMAT_VERSION;
+		header.FileCount = files.size();
+
+		std::ofstream stream(mount->RootDirPath / filename, std::ios::binary);
+		if (!stream)
+			return false;
+
+		stream.unsetf(std::ios::skipws);
+
+		stream << header;
+
+		std::vector<uint64_t> fileOffsetWritePositions(files.size());
+		for (auto i = 0; i < files.size(); ++i)
+		{
+			const auto fileId = files[i];
+			auto* file = GetFile(fileId);
+			if (!file)
+				return false;
+
+			file->MountId = mountId;	   // Update mount id.
+			file->MountRelPath = filename; // Update filename to archive file.
+
+			stream << *file;
+			fileOffsetWritePositions[i] = uint32_t(stream.tellp()) - sizeof(file->Offset);
+		}
+		const uint32_t dataStartOffset = stream.tellp();
+
+		stream.write(reinterpret_cast<const char*>(dataBuffer.GetData()), dataBuffer.GetSize());
+
+		for (auto i = 0; i < files.size(); ++i)
+		{
+			const auto fileId = files[i];
+			auto* file = GetFile(fileId);
+
+			const auto fileOffsetWritePos = fileOffsetWritePositions[i];
+			file->Offset = dataStartOffset + fileDataOffsets[i];
+
+			// Go back and write data offset
+			stream.seekp(fileOffsetWritePos, std::ios::beg);
+			stream.write(reinterpret_cast<const char*>(&file->Offset), sizeof(file->Offset));
+		}
+
+		return true;
+	}
+
+	void Filesystem::SetImporter(const std::vector<std::string>& fileExts, const std::shared_ptr<FileImporter>& importer)
+	{
+		for (const auto& ext : fileExts)
+		{
+			const auto extHash = std::hash<std::string>{}(ext);
+			m_extImporterMap[extHash] = importer;
+		}
+	}
+
+	auto Filesystem::GetImporter(const std::string& fileExt) -> std::shared_ptr<FileImporter>
+	{
+		const auto extHash = std::hash<std::string>{}(fileExt);
+		const auto it = m_extImporterMap.find(extHash);
+		if (it == m_extImporterMap.end())
+			return nullptr;
+
+		return it->second;
+	}
+
+	bool Filesystem::IsPathInMount(const std::filesystem::path& path, MountID mountId)
+	{
+		auto* mount = GetMount(mountId);
+		if (!mount)
+			return false;
+
+		std::filesystem::path finalPath;
+		try
+		{
+			finalPath = std::filesystem::canonical(mount->RootDirPath / path);
+		}
+		catch (const std::exception& /*ex*/)
+		{
+			return false; // Path/File does not exists.
+		}
+
+		auto [rootEnd, nothing] = std::mismatch(mount->RootDirPath.begin(), mount->RootDirPath.end(), finalPath.begin());
+		if (rootEnd == mount->RootDirPath.end())
+			return false;
+
+		return true;
+	}
+
+	bool Filesystem::IsPathInAnyMount(const std::filesystem::path& path)
+	{
+		for (const auto& [id, mount] : m_mountMap)
+		{
+			if (IsPathInMount(path, mount.Id))
+				return true;
+		}
+		return false;
+	}
+
+	auto Filesystem::GetMount(MountID id) -> Mount*
+	{
+		const auto it = m_mountMap.find(id);
+		if (it == m_mountMap.end())
+			return nullptr;
+
+		return &it->second;
+	}
+
+	auto Filesystem::GetFile(FileID id) -> File*
+	{
+		const auto it = m_files.find(id);
+		if (it == m_files.end())
+			return nullptr;
+
+		return &it->second;
+	}
+
+	auto Filesystem::GetMountPathIsIn(const std::filesystem::path& path) -> MountID
+	{
+		for (auto& [id, mount] : m_mountMap)
+		{
+			if (IsPathInMount(path, id))
+				return id;
+		}
+		return InvalidMountId;
+	}
+
+	void Filesystem::GatherFilesInMount(const Mount& mount)
+	{
+		for (const auto& dirEntry : std::filesystem::recursive_directory_iterator(mount.RootDirPath))
+		{
+			if (!dirEntry.is_regular_file())
+				continue;
+
+			const auto filePath = dirEntry.path();
+
+			const auto fileSize = std::filesystem::file_size(filePath);
+			if (fileSize < sizeof(FormatHeader))
+				continue;
+
+			ValidateAndRegisterFile(filePath, mount.Id);
+		}
+	}
+
+	void Filesystem::ValidateAndRegisterFile(const std::filesystem::path& filename, MountID mountId)
+	{
+		std::ifstream stream(filename, std::ios::binary);
+		if (!stream)
+			return;
+
+		FormatHeader header{};
+		stream >> header;
+
+		if (std::memcmp(header.MagicNumber, FS_FORMAT_MAGIC_NUM, sizeof(header.MagicNumber)) != 0)
+			return;
+
+		File file{};
+		stream >> file;
+
+		file.MountId = mountId;
+		file.MountRelPath = filename;
+		m_files[file.FileId] = file;
+	}
+
 	auto operator<<(std::ostream& stream, const FormatHeader& header) -> std::ostream&
 	{
 		stream.write(reinterpret_cast<const char*>(&header.MagicNumber), sizeof(header.MagicNumber));
@@ -308,12 +404,13 @@ namespace gfs
 		stream.write(reinterpret_cast<const char*>(&file.FileId), sizeof(file.FileId));
 
 		// Mount relative path
+		uint16_t strLen = file.MountRelPath.string().size();
+		stream.write(reinterpret_cast<const char*>(&strLen), sizeof(strLen));
 		auto pathStr = file.MountRelPath.string();
-		pathStr.resize(FS_FORMAT_PATH_LENGTH);
-		stream.write(reinterpret_cast<const char*>(pathStr.data()), pathStr.size());
+		stream.write(reinterpret_cast<const char*>(pathStr.data()), strLen);
 
 		// File dependencies
-		const auto count = uint32_t(file.FileDependencies.size());
+		const auto count = uint32_t(file.FileDependencies.size()); // #TODO: Can probably reduce this to a uint16_t (uint8_t?).
 		stream.write(reinterpret_cast<const char*>(&count), sizeof(count));
 		if (!file.FileDependencies.empty())
 			stream.write(reinterpret_cast<const char*>(file.FileDependencies.data()), sizeof(file.FileDependencies[0]) * count);
@@ -329,9 +426,10 @@ namespace gfs
 		stream.read(reinterpret_cast<char*>(&file.FileId), sizeof(file.FileId));
 
 		// Mount relative path
-		std::string pathStr(FS_FORMAT_PATH_LENGTH, 0);
-		stream.read(reinterpret_cast<char*>(pathStr.data()), FS_FORMAT_PATH_LENGTH);
-		pathStr.erase(pathStr.find_last_not_of(char(0)) + 1, std::string::npos);
+		uint16_t strLen = 0;
+		stream.read(reinterpret_cast<char*>(&strLen), sizeof(strLen));
+		std::string pathStr(strLen, 0);
+		stream.read(reinterpret_cast<char*>(pathStr.data()), strLen);
 		file.MountRelPath = pathStr;
 
 		// File dependencies

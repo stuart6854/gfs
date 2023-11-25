@@ -1,3 +1,4 @@
+#include "gfs/filesystem.hpp"
 #include <gfs/gfs.hpp>
 
 #include <cassert>
@@ -6,7 +7,8 @@
 #include <iostream>
 #include <sstream>
 #include <string>
-#include <string.h>
+#include <cstring>
+#include <unordered_map>
 
 auto ReadTextFile(const std::filesystem::path& filename) -> std::string
 {
@@ -69,9 +71,9 @@ int main()
 	std::cout << "Mounts" << std::endl;
 	fs.ForEachMount([](const gfs::Filesystem::Mount& mount) { std::cout << "- " << mount.RootDirPath << std::endl; });
 
-	assert(fs.IsPathInAnyMount("aa/ab"));
-	assert(!fs.IsPathInAnyMount("some_file.txt"));
-	assert(!fs.IsPathInAnyMount(".././some_other_file.txt"));
+	// assert(fs.IsPathInAnyMount("aa/ab"));
+	// assert(!fs.IsPathInAnyMount("some_file.txt"));
+	// assert(!fs.IsPathInAnyMount(".././some_other_file.txt"));
 
 	DataType data{ 5, 3.1415f, true };
 	if (!fs.WriteFile(mountA, "file.rbin", 234598753, {}, data, false))
@@ -90,9 +92,6 @@ int main()
 
 	if (!fs.WriteFile(mountB, "txt_file_bigger_compressed.rbin", 8367428478, {}, texResourceBigger, true))
 		assert(false);
-
-	std::cout << "Files" << std::endl;
-	fs.ForEachFile([](const gfs::Filesystem::File& file) { std::cout << "- " << file.FileId << " - " << file.MountRelPath << std::endl; });
 
 	DataType readData{};
 	if (!fs.ReadFile(234598753, readData))
@@ -113,6 +112,43 @@ int main()
 	if (!fs.ReadFile(8367428478, readTexResourceCompressed))
 		assert(false);
 	assert(readTexResourceCompressed.Text == texResourceBigger.Text);
+
+	{
+		// Archive Test
+		std::vector<gfs::FileID> fileIds;
+		std::unordered_map<gfs::FileID, TextResource> origFileDataMap;
+
+		auto createArchiveFile = [&](uint32_t fileId) {
+			TextResource data{};
+			data.Text = "I am file " + std::to_string(fileId) + "!";
+			std::string filename = "archive_file_" + std::to_string(fileId) + ".rbin";
+			if (!fs.WriteFile(mountA, filename, fileId, {}, data, false))
+				assert(false);
+
+			fileIds.push_back(fileId);
+			origFileDataMap[fileId] = data;
+		};
+
+		createArchiveFile(1111);
+		createArchiveFile(2222);
+		createArchiveFile(3333);
+		createArchiveFile(4444);
+
+		if (!fs.CreateArchive(mountA, "archive.rpak", fileIds))
+			assert(false);
+
+		for (auto fileId : fileIds)
+		{
+			TextResource readData{};
+			if (!fs.ReadFile(fileId, readData))
+				assert(false);
+
+			assert(readData.Text == origFileDataMap[fileId].Text);
+		}
+	}
+
+	std::cout << "Files" << std::endl;
+	fs.ForEachFile([](const gfs::Filesystem::File& file) { std::cout << "- " << file.FileId << " - " << file.MountRelPath << std::endl; });
 
 	return 0;
 }

@@ -89,6 +89,9 @@ namespace gfs
 		// Files
 		//////////////////////////////////////////////////////////////////////////
 
+		/**
+		 * POD type.
+		 */
 		struct File
 		{
 			FileID FileId;						  // The Unique Identifier of the file.
@@ -108,7 +111,7 @@ namespace gfs
 		 * @param id
 		 * @return
 		 */
-		auto GetFile(FileID id) -> const File*;
+		auto GetFile(FileID id) const -> const File*;
 
 		/**
 		 * @brief
@@ -143,7 +146,7 @@ namespace gfs
 		// Archives
 		//////////////////////////////////////////////////////////////////////////
 
-		bool CreateArchive(MountID mount, const std::filesystem::path& filename, const std::vector<FileID>& files);
+		bool CreateArchive(MountID mountId, const std::filesystem::path& filename, const std::vector<FileID>& files);
 
 		//////////////////////////////////////////////////////////////////////////
 		// Import
@@ -187,6 +190,7 @@ namespace gfs
 
 	private:
 		auto GetMount(MountID id) -> Mount*;
+		auto GetFile(FileID id) -> File*;
 
 		auto GetMountPathIsIn(const std::filesystem::path& path) -> MountID;
 
