@@ -12,24 +12,18 @@ A (virtual) filesystem designed to be used by games and game engines.
 - Read files inside of mounts using file ids
 - Iterate mounts & files
 - Optionally compress file data.
+- Combine multiple files into single archive files.
 
 ## Requirements
 
-- C++17
-- LZ4 v1.9.4 (https://github.com/lz4/lz4)
+- C++17 capable compiler (MSVC, Clang++, G++)
+- CMake 3.15+
 
 ## Usage
 
-Clone project and run the following to generate project files:
-```console
-// Windows
-./GenerateProj_VS2022.bat
+This project can either be compiled on its own or consumed as a submodule (CMake ```add_subdirectory```).
 
-// Linux
-./GenerateProj_GMake2.sh
-```
-
-### Example
+## Example
 ```c++
 gfs::Filesystem fs;
 
@@ -60,22 +54,27 @@ struct SomeGameData : gfx::BinaryStreamable
     void Read(gfs::BinaryStreamRead& stream) override;
     void Write(gfs::BinaryStreamWrite& stream) const override;
 }
+std::filesystem::path filename = "some_file.bin";
 FileID newFileId = 98475845; // Could be random uint64 or hash of filepath.
 std::vector<FileId> fileDependencies{};
 SomeGameData dataObj{};
 bool compressData = false; // File data can optionally be compressed using LZ4.
-bool wasWritten = fs.WriteFile(dataMount, newFileId, fileDependencies, dataObj, compressData);
+bool wasWritten = fs.WriteFile(dataMount, filename, newFileId, fileDependencies, dataObj, compressData);
 
 /* Read file */
 // Reads the files data from the disk and writes to the passed `BinaryStreamable` object.
 // Compressed data will also be decompressed automatically.
 bool wasRead = fs.ReadFile(newFileId, dataObj);
 
+/* Create archive */
+gfs::MountID mountId = dataMount;
+std::filesystem::path filename = "archive_file.pbin";
+std::vector<gfs::FileID> files{ 98475845, 111, 222, 666 };
+bool wasCreated = fs.CreateArchive(mountId, filename, files);
 ``` 
 
 ## Planned Features
 
 - Add data compression threshold eg. only compress data greater than ~0.5MB
-- Archive files - Combine multiple (existing) files into a single archive file
 - File importing - Call Filesystem::ImportFile(filename) which gets a FileImporter assigned to file ext and reads, processes and writes a new file
     - Files that were imported track the source filename - allows for reimport, which would potentially allow for asset/resource hot-reloading
