@@ -24,6 +24,9 @@ A (virtual) filesystem designed to be used by games and game engines.
 This project can either be compiled on its own or consumed as a submodule (CMake ```add_subdirectory```).
 
 ## Example
+
+See the `testbed` project for for an runnable example.
+
 ```c++
 gfs::Filesystem fs;
 
