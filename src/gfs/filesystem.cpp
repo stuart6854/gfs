@@ -410,7 +410,7 @@ namespace gfs
 		stream.write(reinterpret_cast<const char*>(pathStr.data()), strLen);
 
 		// File dependencies
-		const auto count = uint32_t(file.FileDependencies.size()); // #TODO: Can probably reduce this to a uint16_t (uint8_t?).
+		const auto count = uint16_t(file.FileDependencies.size());
 		stream.write(reinterpret_cast<const char*>(&count), sizeof(count));
 		if (!file.FileDependencies.empty())
 			stream.write(reinterpret_cast<const char*>(file.FileDependencies.data()), sizeof(file.FileDependencies[0]) * count);
@@ -433,7 +433,7 @@ namespace gfs
 		file.MountRelPath = pathStr;
 
 		// File dependencies
-		uint32_t count = 0;
+		uint16_t count = 0;
 		stream.read(reinterpret_cast<char*>(&count), sizeof(count));
 		file.FileDependencies.resize(count);
 		if (!file.FileDependencies.empty())
