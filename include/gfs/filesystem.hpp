@@ -97,6 +97,7 @@ namespace gfs
 			FileID FileId;						  // The Unique Identifier of the file.
 			MountID MountId;					  // The Id of the mount this file is in.
 			std::filesystem::path MountRelPath;	  // Path to this file relative to the mount it is in.
+			std::filesystem::path SourceFilename; // The source file this file was imported from.
 			std::vector<FileID> FileDependencies; // Files this file references.
 			uint32_t UncompressedSize;
 			uint32_t CompressedSize;
@@ -132,7 +133,8 @@ namespace gfs
 			FileID fileId,
 			const std::vector<FileID>& fileDependencies,
 			const BinaryStreamable& dataObject,
-			bool compress);
+			bool compress,
+			const std::filesystem::path& sourceFilename = "");
 
 		/**
 		 * @brief
@@ -165,6 +167,10 @@ namespace gfs
 		 * @return
 		 */
 		auto GetImporter(const std::string& fileExt) -> std::shared_ptr<FileImporter>;
+
+		bool Import(const std::filesystem::path& filename, MountID outputMount, const std::filesystem::path& outputDir);
+
+		bool Reimport(FileID fileId);
 
 		//////////////////////////////////////////////////////////////////////////
 		// Utility

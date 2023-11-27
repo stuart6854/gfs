@@ -74,10 +74,26 @@ gfs::MountID mountId = dataMount;
 std::filesystem::path filename = "archive_file.pbin";
 std::vector<gfs::FileID> files{ 98475845, 111, 222, 666 };
 bool wasCreated = fs.CreateArchive(mountId, filename, files);
+
+/* Import files */
+struct MyImporter : gfs::FileImporter
+{
+    bool Import(gfs::Filesystem& fs, const std::filesystem::path& importFilename, gfs::MountID outputMount, const std::filesystem::path& outputDir) override
+	{ 
+        ...
+	}
+
+	bool Reimport(gfs::Filesystem& fs, const gfs::Filesystem::File& file) override 
+    {
+        ...
+    }
+};
+fs.SetImporter({ ".txt", ".ext" }, std::make_shared<MyImporter>());
+bool wasImported = fs.Import("path/to/external/file.txt", mountId, "mount/rel/output/dir/");
+bool wasReimported = fs.Reimport(fileId);
+
 ``` 
 
 ## Planned Features
 
 - Add data compression threshold eg. only compress data greater than ~0.5MB
-- File importing - Call Filesystem::ImportFile(filename) which gets a FileImporter assigned to file ext and reads, processes and writes a new file
-    - Files that were imported track the source filename - allows for reimport, which would potentially allow for asset/resource hot-reloading

@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <cstring>
@@ -52,6 +53,29 @@ struct TextResource : gfs::BinaryStreamable
 	void Read(gfs::ReadOnlyByteBuffer& buffer) override { buffer.Read(Text); }
 
 	void Write(gfs::WriteOnlyByteBuffer& buffer) const override { buffer.Write(Text); }
+};
+
+struct TextFileImporter : gfs::FileImporter
+{
+	bool Import(gfs::Filesystem& fs, const std::filesystem::path& importFilename, gfs::MountID outputMount, const std::filesystem::path& outputDir) override
+	{
+		auto text = ReadTextFile(importFilename);
+		if (text.empty())
+			return false;
+
+		TextResource resource{};
+		resource.Text = text;
+
+		auto outputFilename = outputDir / importFilename.filename();
+		outputFilename.replace_extension(".rbin");
+
+		const auto fileId = std::hash<std::filesystem::path>{}(importFilename);
+		fs.WriteFile(outputMount, outputFilename, fileId, {}, resource, resource.Text.size() >= 524288, importFilename);
+
+		return true;
+	}
+
+	bool Reimport(gfs::Filesystem& fs, const gfs::Filesystem::File& file) override { return false; }
 };
 
 int main()
@@ -145,6 +169,18 @@ int main()
 
 			assert(readData.Text == origFileDataMap[fileId].Text);
 		}
+	}
+
+	{
+		// Importing
+		fs.SetImporter({ ".txt" }, std::make_shared<TextFileImporter>());
+		if (!fs.Import("external_files/txt_file.txt", mountA, ""))
+			assert(false);
+
+		TextResource importedFile{};
+		if (!fs.ReadFile(5319311783236469214, importedFile))
+			assert(false);
+		assert(importedFile.Text == shortText.Text);
 	}
 
 	std::cout << "Files" << std::endl;

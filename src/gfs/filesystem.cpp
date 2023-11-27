@@ -1,9 +1,12 @@
 #include "gfs/filesystem.hpp"
 #include "gfs/binary_streams.hpp"
+#include "gfs/file_importer.hpp"
 
-#include <cstdint>
+#include <filesystem>
+#include <functional>
 #include <lz4.h>
 
+#include <cstdint>
 #include <cassert>
 #include <fstream>
 #include <iostream>
@@ -87,7 +90,8 @@ namespace gfs
 		FileID fileId,
 		const std::vector<FileID>& fileDependencies,
 		const BinaryStreamable& dataObject,
-		bool compress)
+		bool compress,
+		const std::filesystem::path& sourceFilename)
 	{
 		auto* mount = GetMount(mountId);
 		if (!mount)
@@ -121,6 +125,7 @@ namespace gfs
 		file.FileId = fileId;
 		file.MountId = mountId;
 		file.MountRelPath = filename;
+		file.SourceFilename = sourceFilename;
 		file.FileDependencies = fileDependencies;
 		file.UncompressedSize = uint32_t(uncompressedDataBuffer.GetSize());
 		file.CompressedSize = uint32_t(compressedDataBuffer.GetSize());
@@ -285,6 +290,36 @@ namespace gfs
 		return it->second;
 	}
 
+	bool Filesystem::Import(const std::filesystem::path& filename, MountID outputMount, const std::filesystem::path& outputDir)
+	{
+		if (filename.empty() || !std::filesystem::exists(filename) || !std::filesystem::is_regular_file(filename))
+			return false;
+
+		const auto fileExt = filename.extension();
+		auto importer = GetImporter(fileExt);
+		if (!importer)
+			return false;
+
+		return importer->Import(*this, filename, outputMount, outputDir);
+	}
+
+	bool Filesystem::Reimport(FileID fileId)
+	{
+		auto* file = GetFile(fileId);
+		if (!file)
+			return false;
+
+		if (file->SourceFilename.empty() || !std::filesystem::exists(file->SourceFilename) || !std::filesystem::is_regular_file(file->SourceFilename))
+			return false;
+
+		const auto fileExt = file->SourceFilename.extension();
+		auto importer = GetImporter(fileExt);
+		if (!importer)
+			return false;
+
+		return importer->Reimport(*this, *file);
+	}
+
 	bool Filesystem::IsPathInMount(const std::filesystem::path& path, MountID mountId)
 	{
 		auto* mount = GetMount(mountId);
@@ -409,6 +444,12 @@ namespace gfs
 		auto pathStr = file.MountRelPath.string();
 		stream.write(reinterpret_cast<const char*>(pathStr.data()), strLen);
 
+		// Source filename
+		strLen = file.SourceFilename.string().size();
+		stream.write(reinterpret_cast<const char*>(&strLen), sizeof(strLen));
+		pathStr = file.SourceFilename.string();
+		stream.write(reinterpret_cast<const char*>(pathStr.data()), strLen);
+
 		// File dependencies
 		const auto count = uint16_t(file.FileDependencies.size());
 		stream.write(reinterpret_cast<const char*>(&count), sizeof(count));
@@ -431,6 +472,13 @@ namespace gfs
 		std::string pathStr(strLen, 0);
 		stream.read(reinterpret_cast<char*>(pathStr.data()), strLen);
 		file.MountRelPath = pathStr;
+
+		// Source filename
+		strLen = 0;
+		stream.read(reinterpret_cast<char*>(&strLen), sizeof(strLen));
+		pathStr = std::string(strLen, 0);
+		stream.read(reinterpret_cast<char*>(pathStr.data()), strLen);
+		file.SourceFilename = pathStr;
 
 		// File dependencies
 		uint16_t count = 0;
