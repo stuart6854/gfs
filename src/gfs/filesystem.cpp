@@ -312,7 +312,7 @@ namespace gfs
 		if (file->SourceFilename.empty() || !std::filesystem::exists(file->SourceFilename) || !std::filesystem::is_regular_file(file->SourceFilename))
 			return false;
 
-		const auto fileExt = file->SourceFilename.extension();
+		const auto fileExt = file->SourceFilename.extension().string();
 		auto importer = GetImporter(fileExt);
 		if (!importer)
 			return false;
