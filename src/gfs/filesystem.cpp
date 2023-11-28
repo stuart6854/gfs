@@ -1,16 +1,19 @@
 #include "gfs/filesystem.hpp"
+
 #include "gfs/binary_streams.hpp"
 #include "gfs/file_importer.hpp"
 
-#include <filesystem>
-#include <functional>
 #include <lz4.h>
 
-#include <cstdint>
 #include <cassert>
-#include <fstream>
-#include <iostream>
+#include <cstdint>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
+#include <functional>
+#include <iostream>
+#include <memory>
+#include <mutex>
 #include <vector>
 
 namespace gfs
@@ -19,6 +22,17 @@ namespace gfs
 	constexpr auto FS_FORMAT_VERSION = 1;
 
 	constexpr uint32_t FS_FORMAT_PATH_LENGTH = 255;
+
+	void Filesystem::Tick()
+	{
+		std::lock_guard lock(m_hotReloadMutex);
+		while (!m_fileHotReloadQueue.empty())
+		{
+			auto fileToReimport = m_fileHotReloadQueue.front();
+			m_fileHotReloadQueue.pop();
+			Reimport(fileToReimport);
+		}
+	}
 
 	auto Filesystem::MountDir(const std::filesystem::path& rootDir, bool allowUnmount) -> MountID
 	{
@@ -149,6 +163,9 @@ namespace gfs
 		stream.write(reinterpret_cast<const char*>(&file.Offset), sizeof(file.Offset));
 
 		m_files[file.FileId] = file; // Register new file.
+
+		if (!file.SourceFilename.empty())
+			CreateFileWatch(file.SourceFilename);
 
 		return true;
 	}
@@ -318,7 +335,11 @@ namespace gfs
 		if (!importer)
 			return false;
 
-		return importer->Reimport(*this, *file);
+		bool success = importer->Reimport(*this, *file);
+		if (success)
+			m_fileReimportCallback(fileId);
+
+		return success;
 	}
 
 	bool Filesystem::IsPathInMount(const std::filesystem::path& path, MountID mountId)
@@ -417,6 +438,46 @@ namespace gfs
 		file.MountId = mountId;
 		file.MountRelPath = filename;
 		m_files[file.FileId] = file;
+
+		if (!file.SourceFilename.empty())
+		{
+			CreateFileWatch(file.SourceFilename);
+		}
+	}
+
+	void Filesystem::CreateFileWatch(const std::filesystem::path& filename)
+	{
+		if (!std::filesystem::exists(filename) || !std::filesystem::is_regular_file(filename))
+			return;
+
+		if (m_existingFileWatchers.find(filename) != m_existingFileWatchers.end())
+			return;
+
+		auto filewatch =
+			std::make_unique<filewatch::FileWatch<std::string>>(filename.string(), [&](const std::string& path, const filewatch::Event changeType) {
+				if (changeType == filewatch::Event::modified)
+					OnFileModified(path);
+			});
+		m_fileWatchers.push_back(std::move(filewatch));
+	}
+
+	void Filesystem::OnFileModified(const std::filesystem::path& filePath)
+	{
+		auto affectedFiles = FindFilesWithSourceFile(filePath);
+		std::lock_guard lock(m_hotReloadMutex);
+		for (auto fileId : affectedFiles)
+			m_fileHotReloadQueue.push(fileId);
+	}
+
+	auto Filesystem::FindFilesWithSourceFile(const std::filesystem::path& sourceFilename) const -> std::vector<FileID>
+	{
+		std::vector<FileID> affectedFiles{};
+		for (const auto& [id, file] : m_files)
+		{
+			if (file.SourceFilename == sourceFilename)
+				affectedFiles.push_back(id);
+		}
+		return affectedFiles;
 	}
 
 	auto operator<<(std::ostream& stream, const FormatHeader& header) -> std::ostream&

@@ -15,17 +15,20 @@ option(LZ4_BUILD_CLI "Build lz4 program" OFF)
 option(LZ4_BUILD_LEGACY_LZ4C "Build lz4c program with legacy argument support" OFF)
 add_subdirectory(external/lz4/build/cmake)
 
-add_library(gfs 
+add_library(filewatch INTERFACE)
+target_include_directories(filewatch INTERFACE external/filewatch)
+
+add_library(gfs
     src/gfs/filesystem.cpp
     src/gfs/binary_streams.cpp
 )
 target_include_directories(gfs PUBLIC include)
-set_target_properties(gfs PROPERTIES 
+set_target_properties(gfs PROPERTIES
     CXX_STANDARD 17
     CXX_STANDARD_REQUIRED ON
     CXX_EXTENSIONS OFF
 )
-target_link_libraries(gfs PRIVATE lz4_static)
+target_link_libraries(gfs PRIVATE lz4_static PUBLIC filewatch)
 
 if(${GFS_BUILD_TESTS})
     message(STATUS "Building testbed")

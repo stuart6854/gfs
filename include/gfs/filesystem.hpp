@@ -2,12 +2,18 @@
 
 #include "binary_streams.hpp"
 
+#include <FileWatch.hpp>
+
 #include <cstdint>
 #include <filesystem>
 #include <functional>
 #include <memory>
+#include <mutex>
+#include <queue>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
+#include <vector>
 
 namespace gfs
 {
@@ -45,6 +51,8 @@ namespace gfs
 	public:
 		Filesystem() = default;
 		~Filesystem() = default;
+
+		void Tick();
 
 		//////////////////////////////////////////////////////////////////////////
 		// Mounts
@@ -173,6 +181,12 @@ namespace gfs
 		bool Reimport(FileID fileId);
 
 		//////////////////////////////////////////////////////////////////////////
+		// Callbacks
+		//////////////////////////////////////////////////////////////////////////
+
+		void SetFileReimportCallback(const std::function<void(FileID fileId)>& callback);
+
+		//////////////////////////////////////////////////////////////////////////
 		// Utility
 		//////////////////////////////////////////////////////////////////////////
 
@@ -203,6 +217,11 @@ namespace gfs
 		void GatherFilesInMount(const Mount& mount);
 		void ValidateAndRegisterFile(const std::filesystem::path& filename, MountID mountId);
 
+		void CreateFileWatch(const std::filesystem::path& filename);
+		void OnFileModified(const std::filesystem::path& filePath);
+
+		auto FindFilesWithSourceFile(const std::filesystem::path& sourceFilename) const -> std::vector<FileID>;
+
 	private:
 		std::unordered_map<MountID, Mount> m_mountMap;
 		MountID m_nextMountId = 1;
@@ -210,6 +229,14 @@ namespace gfs
 		std::unordered_map<FileID, File> m_files;
 
 		std::unordered_map<size_t, std::shared_ptr<FileImporter>> m_extImporterMap;
+
+		std::vector<std::unique_ptr<filewatch::FileWatch<std::string>>> m_fileWatchers;
+		std::unordered_set<std::string> m_existingFileWatchers;
+
+		std::mutex m_hotReloadMutex;
+		std::queue<FileID> m_fileHotReloadQueue;
+
+		std::function<void(FileID)> m_fileReimportCallback;
 	};
 
 } // namespace gfs
