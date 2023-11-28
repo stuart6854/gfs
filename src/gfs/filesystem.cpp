@@ -450,7 +450,7 @@ namespace gfs
 		if (!std::filesystem::exists(filename) || !std::filesystem::is_regular_file(filename))
 			return;
 
-		if (m_existingFileWatchers.find(filename) != m_existingFileWatchers.end())
+		if (m_existingFileWatchers.find(filename.string()) != m_existingFileWatchers.end())
 			return;
 
 		auto filewatch =
@@ -459,6 +459,7 @@ namespace gfs
 					OnFileModified(path);
 			});
 		m_fileWatchers.push_back(std::move(filewatch));
+		m_existingFileWatchers.emplace(filename.string());
 	}
 
 	void Filesystem::OnFileModified(const std::filesystem::path& filePath)
