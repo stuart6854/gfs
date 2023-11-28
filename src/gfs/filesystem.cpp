@@ -100,8 +100,9 @@ namespace gfs
 		WriteOnlyByteBuffer uncompressedDataBuffer;
 		dataObject.Write(uncompressedDataBuffer);
 
+		bool shouldCompress = compress && uncompressedDataBuffer.GetSize() >= FS_COMPRESS_MIN_FILE_SIZE_BYTES;
 		WriteOnlyByteBuffer compressedDataBuffer;
-		if (compress)
+		if (shouldCompress)
 		{
 			compressedDataBuffer.SetSize(uncompressedDataBuffer.GetSize());
 			const uint32_t compressedSize = LZ4_compress_default(reinterpret_cast<const char*>(uncompressedDataBuffer.GetData()),

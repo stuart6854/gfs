@@ -9,10 +9,10 @@
 #include <string>
 #include <unordered_map>
 
-// #TODO: Create binary stream wrapper (to help force binary input/output): https://cplusplus.com/forum/general/97851/
-
 namespace gfs
 {
+	constexpr uint64_t FS_COMPRESS_MIN_FILE_SIZE_BYTES = uint64_t(1024) * uint64_t(512); // 512KB = 0.5MB
+
 	class FileImporter;
 
 	template <typename S, typename T, typename = void>
@@ -125,7 +125,7 @@ namespace gfs
 		 * @param filename
 		 * @param fileId
 		 * @param dataObject
-		 * @param compress
+		 * @param compress Should this data be compressed? Note: Data is only compressed if size is >= FS_COMPRESS_MIN_FILE_SIZE_BYTES.
 		 * @return
 		 */
 		bool WriteFile(MountID mountId,
