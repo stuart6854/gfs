@@ -1,18 +1,20 @@
 ﻿# Solution
-.vs/
-.vscode/
 .idea/
-*.user
-*.sln
-*.vcxproj
-*.vcxproj.filter
-Makefile
-*.make
+.vs/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/*.code-snippets
+## Local History for Visual Studio Code
+.history/
 
 # Build
 build/
 bin/
 obj/
+cmake-build-*/
 
 # Uneeded Resources
 *.rbin
