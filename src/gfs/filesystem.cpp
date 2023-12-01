@@ -95,6 +95,7 @@ namespace gfs
 
 	void Filesystem::ForEachFile(const std::function<void(const File& file)>& func)
 	{
+		std::lock_guard lock(m_fileMutex);
 		for (const auto& [id, file] : m_files)
 			func(file);
 	}
@@ -162,7 +163,10 @@ namespace gfs
 		stream.seekp(offsetPos, std::ios::beg);
 		stream.write(reinterpret_cast<const char*>(&file.Offset), sizeof(file.Offset));
 
-		m_files[file.FileId] = file; // Register new file.
+		{
+			std::lock_guard lock(m_fileMutex);
+			m_files[file.FileId] = file; // Register new file.
+		}
 
 		if (!file.SourceFilename.empty())
 			CreateFileWatch(file.SourceFilename);
@@ -386,6 +390,8 @@ namespace gfs
 
 	auto Filesystem::GetFile(FileID id) -> File*
 	{
+		std::lock_guard lock(m_fileMutex);
+
 		const auto it = m_files.find(id);
 		if (it == m_files.end())
 			return nullptr;
@@ -437,7 +443,11 @@ namespace gfs
 
 		file.MountId = mountId;
 		file.MountRelPath = filename;
-		m_files[file.FileId] = file;
+
+		{
+			std::lock_guard lock(m_fileMutex);
+			m_files[file.FileId] = file;
+		}
 
 		if (!file.SourceFilename.empty())
 		{

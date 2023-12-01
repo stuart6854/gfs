@@ -227,6 +227,7 @@ namespace gfs
 		MountID m_nextMountId = 1;
 
 		std::unordered_map<FileID, File> m_files;
+		std::mutex m_fileMutex;
 
 		std::unordered_map<size_t, std::shared_ptr<FileImporter>> m_extImporterMap;
 
