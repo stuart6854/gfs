@@ -78,6 +78,11 @@ namespace gfs
 		return InvalidMountId;
 	}
 
+	auto Filesystem::GetMount(MountID mountId) -> const Mount*
+	{
+		return GetMount_Internal(mountId);
+	}
+
 	void Filesystem::ForEachMount(const std::function<void(const Mount&)>& func)
 	{
 		for (const auto& [id, mount] : m_mountMap)
@@ -109,7 +114,7 @@ namespace gfs
 		const std::filesystem::path& sourceFilename,
 		const std::string& metadata)
 	{
-		auto* mount = GetMount(mountId);
+		auto* mount = GetMount_Internal(mountId);
 		if (!mount)
 			return false;
 
@@ -182,7 +187,7 @@ namespace gfs
 		if (!file)
 			return false;
 
-		auto* mount = GetMount(file->MountId);
+		auto* mount = GetMount_Internal(file->MountId);
 		if (!mount)
 			return false;
 
@@ -213,7 +218,7 @@ namespace gfs
 
 	bool Filesystem::CreateArchive(MountID mountId, const std::filesystem::path& filename, const std::vector<FileID>& files)
 	{
-		auto* mount = GetMount(mountId);
+		auto* mount = GetMount_Internal(mountId);
 		if (!mount)
 			return false;
 
@@ -350,7 +355,7 @@ namespace gfs
 
 	bool Filesystem::IsPathInMount(const std::filesystem::path& path, MountID mountId)
 	{
-		auto* mount = GetMount(mountId);
+		auto* mount = GetMount_Internal(mountId);
 		if (!mount)
 			return false;
 
@@ -381,7 +386,7 @@ namespace gfs
 		return false;
 	}
 
-	auto Filesystem::GetMount(MountID id) -> Mount*
+	auto Filesystem::GetMount_Internal(MountID id) -> Mount*
 	{
 		const auto it = m_mountMap.find(id);
 		if (it == m_mountMap.end())

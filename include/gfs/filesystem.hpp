@@ -87,6 +87,8 @@ namespace gfs
 		 */
 		auto GetMountId(const std::filesystem::path& rootDir) -> MountID;
 
+		auto GetMount(MountID mountId) -> const Mount*;
+
 		/**
 		 * @brief Runs the given function for each mounted directory.
 		 * @param func
@@ -211,7 +213,7 @@ namespace gfs
 		bool IsPathInAnyMount(const std::filesystem::path& path);
 
 	private:
-		auto GetMount(MountID id) -> Mount*;
+		auto GetMount_Internal(MountID id) -> Mount*;
 		auto GetFile(FileID id) -> File*;
 
 		auto GetMountPathIsIn(const std::filesystem::path& path) -> MountID;
