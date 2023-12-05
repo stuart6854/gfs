@@ -60,7 +60,11 @@ struct TextResource : gfs::BinaryStreamable
 
 struct TextFileImporter : gfs::FileImporter
 {
-	bool Import(gfs::Filesystem& fs, const std::filesystem::path& importFilename, gfs::MountID outputMount, const std::filesystem::path& outputDir) override
+	bool Import(gfs::Filesystem& fs,
+		const std::filesystem::path& importFilename,
+		gfs::MountID outputMount,
+		const std::filesystem::path& outputDir,
+		const std::string& metadata) override
 	{
 		auto text = ReadTextFile(importFilename);
 		if (text.empty())

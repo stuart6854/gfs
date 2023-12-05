@@ -106,7 +106,8 @@ namespace gfs
 		const std::vector<FileID>& fileDependencies,
 		const BinaryStreamable& dataObject,
 		bool compress,
-		const std::filesystem::path& sourceFilename)
+		const std::filesystem::path& sourceFilename,
+		const std::string& metadata)
 	{
 		auto* mount = GetMount(mountId);
 		if (!mount)
@@ -142,6 +143,7 @@ namespace gfs
 		file.MountId = mountId;
 		file.MountRelPath = filename;
 		file.SourceFilename = sourceFilename;
+		file.MetadataStr = metadata;
 		file.FileDependencies = fileDependencies;
 		file.UncompressedSize = uint32_t(uncompressedDataBuffer.GetSize());
 		file.CompressedSize = uint32_t(compressedDataBuffer.GetSize());
@@ -312,17 +314,17 @@ namespace gfs
 		return it->second;
 	}
 
-	bool Filesystem::Import(const std::filesystem::path& filename, MountID outputMount, const std::filesystem::path& outputDir)
+	bool Filesystem::Import(const std::filesystem::path& filename, MountID outputMount, const std::filesystem::path& outputDir, const std::string& metadata)
 	{
 		if (filename.empty() || !std::filesystem::exists(filename) || !std::filesystem::is_regular_file(filename))
 			return false;
 
 		const auto fileExt = filename.extension().string();
-		auto importer = GetImporter(fileExt);
+		const auto importer = GetImporter(fileExt);
 		if (!importer)
 			return false;
 
-		return importer->Import(*this, filename, outputMount, outputDir);
+		return importer->Import(*this, filename, outputMount, outputDir, metadata);
 	}
 
 	bool Filesystem::Reimport(FileID fileId)
@@ -523,6 +525,11 @@ namespace gfs
 		pathStr = file.SourceFilename.string();
 		stream.write(reinterpret_cast<const char*>(pathStr.data()), strLen);
 
+		// Metadata
+		strLen = file.MetadataStr.size();
+		stream.write(reinterpret_cast<const char*>(&strLen), sizeof(strLen));
+		stream.write(reinterpret_cast<const char*>(file.MetadataStr.data()), strLen);
+
 		// File dependencies
 		const auto count = uint16_t(file.FileDependencies.size());
 		stream.write(reinterpret_cast<const char*>(&count), sizeof(count));
@@ -552,6 +559,13 @@ namespace gfs
 		pathStr = std::string(strLen, 0);
 		stream.read(reinterpret_cast<char*>(pathStr.data()), strLen);
 		file.SourceFilename = pathStr;
+
+		// Source filename
+		strLen = 0;
+		stream.read(reinterpret_cast<char*>(&strLen), sizeof(strLen));
+		pathStr = std::string(strLen, 0);
+		stream.read(reinterpret_cast<char*>(pathStr.data()), strLen);
+		file.MetadataStr = pathStr;
 
 		// File dependencies
 		uint16_t count = 0;
