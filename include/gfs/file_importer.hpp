@@ -1,8 +1,9 @@
 #pragma once
 
-#include "filesystem.hpp"
+#if 0
+	#include "filesystem.hpp"
 
-#include <filesystem>
+	#include <filesystem>
 
 namespace gfs
 {
@@ -20,3 +21,4 @@ namespace gfs
 	};
 
 } // namespace gfs
+#endif

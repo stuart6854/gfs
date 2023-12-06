@@ -1,10 +1,11 @@
 #pragma once
 
-#include <filesystem>
-#include <fstream>
-#include <string>
-#include <type_traits>
-#include <vector>
+#if 0
+	#include <filesystem>
+	#include <fstream>
+	#include <string>
+	#include <type_traits>
+	#include <vector>
 
 namespace gfs
 {
@@ -85,3 +86,5 @@ namespace gfs
     };
 
 }
+
+#endif

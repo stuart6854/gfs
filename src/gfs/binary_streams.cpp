@@ -1,5 +1,6 @@
 #include "gfs/binary_streams.hpp"
 
+#if 0
 #include <cstring>
 
 namespace gfs
@@ -106,3 +107,5 @@ namespace gfs
     }
 
 }
+
+#endif
