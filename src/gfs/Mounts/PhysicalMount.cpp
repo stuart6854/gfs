@@ -45,8 +45,12 @@ namespace gfs
 		if (!exists(cwdRelativeFilename.parent_path()))
 			return false;
 
-		const std::ofstream stream(cwdRelativeFilename);
-		return !stream.fail();
+		std::ofstream stream(cwdRelativeFilename);
+		if (stream.fail())
+			return false;
+
+		stream.close();
+		return true;
 	}
 
 	bool PhysicalMount::DeleteFile(const std::string& filename)
