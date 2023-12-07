@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Common.hpp"
 #include "Mounts/Mount.hpp"
 
 #include <filesystem>
@@ -11,11 +12,23 @@ namespace gfs
 	class Filesystem
 	{
 	public:
+		////////////////////////////////////////
+		/// Mounts
+		////////////////////////////////////////
+
 		template <typename T, typename... Args>
 		auto AddMount(const std::string& alias, Args&&... args) -> Mount*;
 		void RemoveMount(Mount& mount);
 
 		auto GetMountByAlias(const std::string& alias) const -> Mount*;
+		auto GetMountByFile(const std::string& filename) const -> Mount*;
+
+		////////////////////////////////////////
+		/// Files
+		////////////////////////////////////////
+
+		bool ReadFileIntoString(const std::string& filename, std::string& outString) const;
+		bool ReadFileIntoMemory(const std::string& filename, MemBuffer& outMemBuffer) const;
 
 	private:
 		std::vector<std::unique_ptr<Mount>> m_mounts;

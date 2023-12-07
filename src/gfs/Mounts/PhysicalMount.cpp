@@ -1,6 +1,7 @@
 #include "gfs/Mounts/PhysicalMount.hpp"
 
 #include <fstream>
+#include <iterator>
 #include <utility>
 
 namespace gfs
@@ -60,7 +61,7 @@ namespace gfs
 		if (std::filesystem::path(filename).extension().empty())
 			return false;
 
-		if (!CheckFileExists(filename))
+		if (!HasFile(filename))
 			return false;
 
 		const auto cwdRelativeFilename = m_rootPath / filename;
@@ -75,10 +76,10 @@ namespace gfs
 		if (std::filesystem::path(filename).extension().empty() || std::filesystem::path(newFilename).extension().empty())
 			return false;
 
-		if (!CheckFileExists(filename))
+		if (!HasFile(filename))
 			return false;
 
-		if (CheckFileExists(newFilename))
+		if (HasFile(newFilename))
 			return false;
 
 		const auto cwdRelativeFilename = m_rootPath / filename;
@@ -88,13 +89,90 @@ namespace gfs
 		return true;
 	}
 
-	bool PhysicalMount::CheckFileExists(const std::string& filename) const
+	bool PhysicalMount::HasFile(const std::string& filename) const
 	{
 		if (std::filesystem::path(filename).empty())
+			return false;
+		if (std::filesystem::path(filename).extension().empty())
 			return false;
 
 		const auto cwdRelativeFilename = m_rootPath / filename;
 		return exists(cwdRelativeFilename) && is_regular_file(cwdRelativeFilename);
+	}
+
+	bool PhysicalMount::WriteStringToFile(const std::string& filename, const std::string& text)
+	{
+		if (std::filesystem::path(filename).empty())
+			return false;
+		if (std::filesystem::path(filename).extension().empty())
+			return false;
+
+		const auto cwdRelativeFilename = m_rootPath / filename;
+		std::ofstream stream(cwdRelativeFilename, std::ios::out);
+		if (stream.fail())
+			return false;
+
+		stream.write(text.data(), static_cast<std::streamsize>(text.size()));
+		return !stream.fail();
+	}
+
+	bool PhysicalMount::WriteMemoryToFile(const std::string& filename, const MemBuffer& memBuffer)
+	{
+		if (std::filesystem::path(filename).empty())
+			return false;
+		if (std::filesystem::path(filename).extension().empty())
+			return false;
+
+		const auto cwdRelativeFilename = m_rootPath / filename;
+		std::ofstream stream(cwdRelativeFilename, std::ios::out | std::ios::binary);
+		if (stream.fail())
+			return false;
+
+		stream.write(reinterpret_cast<const char*>(memBuffer.data()), static_cast<std::streamsize>(memBuffer.size()));
+
+		return !stream.fail();
+	}
+
+	bool PhysicalMount::ReadFileIntoString(const std::string& filename, std::string& outString)
+	{
+		if (!HasFile(filename))
+			return false;
+
+		const auto cwdRelativeFilename = m_rootPath / filename;
+		std::ifstream stream(cwdRelativeFilename, std::ios::in | std::ios::binary | std::ios::ate);
+		if (stream.fail())
+			return false;
+
+		stream.unsetf(std::ios::skipws);
+
+		const size_t fileSize = stream.tellg();
+		stream.seekg(0, std::ios::beg);
+
+		outString.reserve(fileSize);
+		outString.insert(outString.begin(), std::istream_iterator<char>(stream), std::istream_iterator<char>());
+
+		return outString.size() == fileSize;
+	}
+
+	bool PhysicalMount::ReadFileIntoMemory(const std::string& filename, MemBuffer& outMemBuffer)
+	{
+		if (!HasFile(filename))
+			return false;
+
+		const auto cwdRelativeFilename = m_rootPath / filename;
+		std::ifstream stream(cwdRelativeFilename, std::ios::in | std::ios::binary | std::ios::ate);
+		if (stream.fail())
+			return false;
+
+		stream.unsetf(std::ios::skipws);
+
+		const size_t fileSize = stream.tellg();
+		stream.seekg(0, std::ios::beg);
+
+		outMemBuffer.reserve(fileSize);
+		outMemBuffer.insert(outMemBuffer.begin(), std::istream_iterator<uint8_t>(stream), std::istream_iterator<uint8_t>());
+
+		return outMemBuffer.size() == fileSize;
 	}
 
 } // namespace gfs

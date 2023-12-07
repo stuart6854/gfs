@@ -21,7 +21,13 @@ namespace gfs
 		bool DeleteFile(const std::string& filename) override;
 		bool MoveFile(const std::string& filename, const std::string& newFilename) override;
 
-		bool CheckFileExists(const std::string& filename) const override;
+		bool HasFile(const std::string& filename) const override;
+
+		bool WriteStringToFile(const std::string& filename, const std::string& text) override;
+		bool WriteMemoryToFile(const std::string& filename, const MemBuffer& memBuffer) override;
+
+		bool ReadFileIntoString(const std::string& filename, std::string& outString) override;
+		bool ReadFileIntoMemory(const std::string& filename, MemBuffer& outMemBuffer) override;
 
 	private:
 		std::filesystem::path m_rootPath;
