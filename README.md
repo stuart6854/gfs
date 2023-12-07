@@ -7,16 +7,16 @@
 A (virtual) filesystem designed to be used by games and game engines.
 
 ### Features
-- Mount & Unmount directories
-- Create files under mounts with data
-- Read files inside of mounts using file ids
-- Iterate mounts & files
-- Optionally compress file data.
-- Combine multiple files into single archive files.
+
+- Add/Remove mounts
+
+[//]: # (- Iterate mounts & files)
+[//]: # (- Optionally compress file data.)
+[//]: # (- Combine multiple files into single archive files.)
 
 ## Requirements
 
-- C++17 capable compiler (MSVC, Clang++, G++)
+- C++17 capable compiler (MSVC, Clang, GCC)
 - CMake 3.15+
 
 ## Usage
@@ -25,75 +25,145 @@ This project can either be compiled on its own or consumed as a submodule (CMake
 
 ## Example
 
-See the `testbed` project for for an runnable example.
+*TODO*
 
-```c++
-gfs::Filesystem fs;
+[//]: # (See the `testbed` project for for an runnable example.)
 
-// Mount a directory that cannot be unmounted.
-MountID dataMount = fs.MountDir("data"), false);
-if(dataMount == gfs::InvalidMountId)
-    std::cout << "Failed to mount data dir." << std::endl;
+[//]: # ()
 
-// Mount a directory that can be unmounted.
-MountID modsMount = fs.MountDir("mods"), true);
-if(dataMount == gfs::InvalidMountId)
-    std::cout << "Failed to mount mods dir." << std::endl;
+[//]: # (```c++)
 
-// Ummount a directory.
-bool wasUmounted = fs.Unmount(modsMount);
+[//]: # (gfs::Filesystem fs;)
 
-// Iterate mounts & files.
-fs.ForeachMount([](const gfs::Filesystem::Mount& mount){});
-fs.ForeachFile([](const gfs::Filesystem::File& file){});
+[//]: # ()
 
-/* Write new file */
-struct SomeGameData : gfx::BinaryStreamable
-{
-    float time;
-    uint32_t x;
-    uint32_t y;
+[//]: # (// Mount a directory that cannot be unmounted.)
 
-    void Read(gfs::BinaryStreamRead& stream) override;
-    void Write(gfs::BinaryStreamWrite& stream) const override;
-}
-std::filesystem::path filename = "some_file.bin";
-FileID newFileId = 98475845; // Could be random uint64 or hash of filepath.
-std::vector<FileId> fileDependencies{};
-SomeGameData dataObj{};
-bool compressData = false; // File data can optionally be compressed using LZ4.
-bool wasWritten = fs.WriteFile(dataMount, filename, newFileId, fileDependencies, dataObj, compressData);
+[//]: # (MountID dataMount = fs.MountDir&#40;"data"&#41;, false&#41;;)
 
-/* Read file */
-// Reads the files data from the disk and writes to the passed `BinaryStreamable` object.
-// Compressed data will also be decompressed automatically.
-bool wasRead = fs.ReadFile(newFileId, dataObj);
+[//]: # (if&#40;dataMount == gfs::InvalidMountId&#41;)
 
-/* Create archive */
-gfs::MountID mountId = dataMount;
-std::filesystem::path filename = "archive_file.pbin";
-std::vector<gfs::FileID> files{ 98475845, 111, 222, 666 };
-bool wasCreated = fs.CreateArchive(mountId, filename, files);
+[//]: # (    std::cout << "Failed to mount data dir." << std::endl;)
 
-/* Import files */
-struct MyImporter : gfs::FileImporter
-{
-    bool Import(gfs::Filesystem& fs, const std::filesystem::path& importFilename, gfs::MountID outputMount, const std::filesystem::path& outputDir) override
-	{ 
-        ...
-	}
+[//]: # ()
 
-	bool Reimport(gfs::Filesystem& fs, const gfs::Filesystem::File& file) override 
-    {
-        ...
-    }
-};
-fs.SetImporter({ ".txt", ".ext" }, std::make_shared<MyImporter>());
-bool wasImported = fs.Import("path/to/external/file.txt", mountId, "mount/rel/output/dir/");
-bool wasReimported = fs.Reimport(fileId);
+[//]: # (// Mount a directory that can be unmounted.)
 
-``` 
+[//]: # (MountID modsMount = fs.MountDir&#40;"mods"&#41;, true&#41;;)
+
+[//]: # (if&#40;dataMount == gfs::InvalidMountId&#41;)
+
+[//]: # (    std::cout << "Failed to mount mods dir." << std::endl;)
+
+[//]: # ()
+
+[//]: # (// Ummount a directory.)
+
+[//]: # (bool wasUmounted = fs.Unmount&#40;modsMount&#41;;)
+
+[//]: # ()
+
+[//]: # (// Iterate mounts & files.)
+
+[//]: # (fs.ForeachMount&#40;[]&#40;const gfs::Filesystem::Mount& mount&#41;{}&#41;;)
+
+[//]: # (fs.ForeachFile&#40;[]&#40;const gfs::Filesystem::File& file&#41;{}&#41;;)
+
+[//]: # ()
+
+[//]: # (/* Write new file */)
+
+[//]: # (struct SomeGameData : gfx::BinaryStreamable)
+
+[//]: # ({)
+
+[//]: # (    float time;)
+
+[//]: # (    uint32_t x;)
+
+[//]: # (    uint32_t y;)
+
+[//]: # ()
+
+[//]: # (    void Read&#40;gfs::BinaryStreamRead& stream&#41; override;)
+
+[//]: # (    void Write&#40;gfs::BinaryStreamWrite& stream&#41; const override;)
+
+[//]: # (})
+
+[//]: # (std::filesystem::path filename = "some_file.bin";)
+
+[//]: # (FileID newFileId = 98475845; // Could be random uint64 or hash of filepath.)
+
+[//]: # (std::vector<FileId> fileDependencies{};)
+
+[//]: # (SomeGameData dataObj{};)
+
+[//]: # (bool compressData = false; // File data can optionally be compressed using LZ4.)
+
+[//]: # (bool wasWritten = fs.WriteFile&#40;dataMount, filename, newFileId, fileDependencies, dataObj, compressData&#41;;)
+
+[//]: # ()
+
+[//]: # (/* Read file */)
+
+[//]: # (// Reads the files data from the disk and writes to the passed `BinaryStreamable` object.)
+
+[//]: # (// Compressed data will also be decompressed automatically.)
+
+[//]: # (bool wasRead = fs.ReadFile&#40;newFileId, dataObj&#41;;)
+
+[//]: # ()
+
+[//]: # (/* Create archive */)
+
+[//]: # (gfs::MountID mountId = dataMount;)
+
+[//]: # (std::filesystem::path filename = "archive_file.pbin";)
+
+[//]: # (std::vector<gfs::FileID> files{ 98475845, 111, 222, 666 };)
+
+[//]: # (bool wasCreated = fs.CreateArchive&#40;mountId, filename, files&#41;;)
+
+[//]: # ()
+
+[//]: # (/* Import files */)
+
+[//]: # (struct MyImporter : gfs::FileImporter)
+
+[//]: # ({)
+
+[//]: # (    bool Import&#40;gfs::Filesystem& fs, const std::filesystem::path& importFilename, gfs::MountID outputMount, const std::filesystem::path& outputDir&#41; override)
+
+[//]: # (	{ )
+
+[//]: # (        ...)
+
+[//]: # (	})
+
+[//]: # ()
+
+[//]: # (	bool Reimport&#40;gfs::Filesystem& fs, const gfs::Filesystem::File& file&#41; override )
+
+[//]: # (    {)
+
+[//]: # (        ...)
+
+[//]: # (    })
+
+[//]: # (};)
+
+[//]: # (fs.SetImporter&#40;{ ".txt", ".ext" }, std::make_shared<MyImporter>&#40;&#41;&#41;;)
+
+[//]: # (bool wasImported = fs.Import&#40;"path/to/external/file.txt", mountId, "mount/rel/output/dir/"&#41;;)
+
+[//]: # (bool wasReimported = fs.Reimport&#40;fileId&#41;;)
+
+[//]: # ()
+
+[//]: # (``` )
 
 ## Planned Features
 
-- Add data compression threshold eg. only compress data greater than ~0.5MB
+- Allow user to specify specific mount for file-related methods on Filesystem e.g.
+  filename=`"mount_alias:some_dir/some_file.txt" `
