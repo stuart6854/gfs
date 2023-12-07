@@ -28,6 +28,18 @@ option(GFS_BUILD_TESTS "Build test" ${GFS_MASTER_PROJECT})
 include(cmake/CPM.cmake)
 
 CPMAddPackage(
+        NAME filewatch
+        GIT_TAG a59891baf375b73ff28144973a6fafd3fe40aa21
+        GITHUB_REPOSITORY ThomasMonkman/filewatch
+        OPTIONS
+        "BuildTests OFF"
+)
+if (filewatch_ADDED)
+    add_library(filewatch INTERFACE)
+    target_include_directories(filewatch SYSTEM INTERFACE ${filewatch_SOURCE_DIR})
+endif ()
+
+CPMAddPackage(
         NAME nlohmann_json
         VERSION 3.11.3
         # the git repo is incredibly large, so we download the archived include directory
@@ -85,7 +97,10 @@ target_include_directories(gfs PRIVATE include)
 target_include_directories(gfs SYSTEM INTERFACE include)
 
 # Link dependencies
-target_link_libraries(gfs PRIVATE nlohmann_json Bitsery::bitsery lz4_static)
+target_link_libraries(gfs
+        PRIVATE nlohmann_json Bitsery::bitsery lz4_static
+        PUBLIC filewatch
+)
 
 # ---- Tests ----
 

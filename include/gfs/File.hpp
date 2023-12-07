@@ -1,12 +1,20 @@
 #pragma once
 
-#include <cstdint>
-#include <string>
-#include <vector>
+// #include <cstdint>
+// #include <string>
+// #include <vector>
 
 namespace gfs
 {
-	using FileID = uint64_t;
+	class Mount;
+
+	/*struct FileHandle
+	{
+		Mount* mount = nullptr;
+		uint64_t filenameHash;
+	};*/
+
+	/*using FileID = uint64_t;
 	constexpr FileID InvalidFileId = 0;
 
 	constexpr uint8_t FileFormatVersion = 0;
@@ -21,6 +29,6 @@ namespace gfs
 		uint64_t uncompressedSize;
 		uint64_t compressedSize;
 		uint64_t offset;
-	};
+	};*/
 
 } // namespace gfs

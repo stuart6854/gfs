@@ -41,17 +41,17 @@ TEST_CASE("Physical Mount", "[mount][physical]")
 	auto* osMount = fs.AddMount<gfs::PhysicalMount>("data", "./data");
 	REQUIRE(osMount != nullptr);
 
-	SECTION("CreateFile")
+	/*SECTION("CreateFile")
 	{
 		REQUIRE_FALSE(osMount->CreateFile(""));
 		REQUIRE_FALSE(osMount->CreateFile("invalid_filename"));
 		REQUIRE(osMount->CreateFile("hello_world.txt"));
 		REQUIRE(osMount->CreateFile("some_file.txt"));
 		REQUIRE(osMount->CreateFile("some_dir/some_file.txt"));
-	}
+	}*/
 	SECTION("DeleteFile")
 	{
-		REQUIRE(osMount->CreateFile("hello_world.txt"));
+		REQUIRE(osMount->WriteStringToFile("hello_world.txt", ""));
 
 		REQUIRE_FALSE(osMount->DeleteFile(""));
 		REQUIRE_FALSE(osMount->DeleteFile("invalid_filename"));
@@ -59,7 +59,7 @@ TEST_CASE("Physical Mount", "[mount][physical]")
 	}
 	SECTION("MoveFile")
 	{
-		REQUIRE(osMount->CreateFile("some_file.txt"));
+		REQUIRE(osMount->WriteStringToFile("some_file.txt", ""));
 
 		REQUIRE_FALSE(osMount->MoveFile("", ""));
 		REQUIRE_FALSE(osMount->MoveFile("abc", ""));
@@ -72,8 +72,8 @@ TEST_CASE("Physical Mount", "[mount][physical]")
 	}
 	SECTION("CheckFileExists")
 	{
-		REQUIRE(osMount->CreateFile("some_dir/some_file.txt"));
-		REQUIRE(osMount->CreateFile("some_file.txt"));
+		REQUIRE(osMount->WriteStringToFile("some_dir/some_file.txt", ""));
+		REQUIRE(osMount->WriteStringToFile("some_file.txt", ""));
 		REQUIRE(osMount->MoveFile("some_file.txt", "some_file_moved.txt"));
 
 		REQUIRE_FALSE(osMount->HasFile(""));

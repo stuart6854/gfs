@@ -21,30 +21,40 @@ namespace gfs
 		return nullptr;
 	}
 
-	auto Filesystem::GetMountByFile(const std::string& filename) const -> Mount*
+	auto Filesystem::GetMountByFile(const StrId& fileId) const -> Mount*
 	{
-		const auto it = std::find_if(m_mounts.begin(), m_mounts.end(), [=](const auto& mountPtr) { return mountPtr->HasFile(filename); });
+		const auto it = std::find_if(m_mounts.begin(), m_mounts.end(), [=](const auto& mountPtr) { return mountPtr->HasFile(fileId); });
 		if (it != m_mounts.end())
 			return it->get();
 		return nullptr;
 	}
 
-	bool Filesystem::ReadFileIntoString(const std::string& filename, std::string& outString) const
+	bool Filesystem::ReadFileIntoString(std::string& outString, const StrId& fileId, Mount* forceMount) const
 	{
-		auto* mount = GetMountByFile(filename);
+		Mount* mount = nullptr;
+		if (forceMount)
+			mount = forceMount;
+		else
+			mount = GetMountByFile(fileId);
+
 		if (mount == nullptr)
 			return false;
 
-		return mount->ReadFileIntoString(filename, outString);
+		return mount->ReadFileIntoString(fileId, outString);
 	}
 
-	bool Filesystem::ReadFileIntoMemory(const std::string& filename, MemBuffer& outMemBuffer) const
+	bool Filesystem::ReadFileIntoMemory(MemBuffer& outMemBuffer, const StrId& fileId, Mount* forceMount) const
 	{
-		auto* mount = GetMountByFile(filename);
+		Mount* mount = nullptr;
+		if (forceMount)
+			mount = forceMount;
+		else
+			mount = GetMountByFile(fileId);
+
 		if (mount == nullptr)
 			return false;
 
-		return mount->ReadFileIntoMemory(filename, outMemBuffer);
+		return mount->ReadFileIntoMemory(fileId, outMemBuffer);
 	}
 
 } // namespace gfs

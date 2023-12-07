@@ -21,14 +21,20 @@ namespace gfs
 		void RemoveMount(Mount& mount);
 
 		auto GetMountByAlias(const std::string& alias) const -> Mount*;
-		auto GetMountByFile(const std::string& filename) const -> Mount*;
+
+		/**
+		 * \brief Get the first mount that has the file.
+		 * \param fileId
+		 * \return
+		 */
+		auto GetMountByFile(const StrId& fileId) const -> Mount*;
 
 		////////////////////////////////////////
 		/// Files
 		////////////////////////////////////////
 
-		bool ReadFileIntoString(const std::string& filename, std::string& outString) const;
-		bool ReadFileIntoMemory(const std::string& filename, MemBuffer& outMemBuffer) const;
+		bool ReadFileIntoString(std::string& outString, const StrId& fileId, Mount* forceMount = nullptr) const;
+		bool ReadFileIntoMemory(MemBuffer& outMemBuffer, const StrId& fileId, Mount* forceMount = nullptr) const;
 
 	private:
 		std::vector<std::unique_ptr<Mount>> m_mounts;

@@ -2,7 +2,11 @@
 
 #include "Mount.hpp"
 
+#include <FileWatch.hpp>
+
 #include <filesystem>
+#include <mutex>
+#include <unordered_map>
 
 namespace gfs
 {
@@ -17,20 +21,35 @@ namespace gfs
 
 		void Flush() override;
 
-		bool CreateFile(const std::string& filename) override;
-		bool DeleteFile(const std::string& filename) override;
-		bool MoveFile(const std::string& filename, const std::string& newFilename) override;
+		bool DeleteFile(const StrId& fileId) override;
+		bool MoveFile(const StrId& fileId, const std::string& newFilename) override;
 
-		bool HasFile(const std::string& filename) const override;
+		bool HasFile(const StrId& fileId) const override;
 
 		bool WriteStringToFile(const std::string& filename, const std::string& text) override;
 		bool WriteMemoryToFile(const std::string& filename, const MemBuffer& memBuffer) override;
 
-		bool ReadFileIntoString(const std::string& filename, std::string& outString) override;
-		bool ReadFileIntoMemory(const std::string& filename, MemBuffer& outMemBuffer) override;
+		bool ReadFileIntoString(const StrId& fileId, std::string& outString) override;
+		bool ReadFileIntoMemory(const StrId& fileId, MemBuffer& outMemBuffer) override;
+
+	private:
+		struct File
+		{
+			StrId id;
+			std::string filename;
+		};
+		void AddFile(const std::string& filename);
+		void RemoveFile(const std::string& filename);
+		auto GetFile(const StrId& fileId) const -> const File*;
+
+		void DiscoverExistingFiles();
+		void SetupFilewatch();
 
 	private:
 		std::filesystem::path m_rootPath;
+		std::unique_ptr<filewatch::FileWatch<std::string>> m_filewatch;
+		mutable std::mutex m_mutex;
+		std::unordered_map<StrId, File> m_fileMap{};
 	};
 
 } // namespace gfs
