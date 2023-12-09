@@ -29,28 +29,18 @@ namespace gfs
 		return nullptr;
 	}
 
-	bool Filesystem::ReadFileIntoString(std::string& outString, const StrId& fileId, Mount* forceMount) const
+	bool Filesystem::ReadFileIntoString(std::string& outString, const StrId& fileId) const
 	{
-		Mount* mount = nullptr;
-		if (forceMount)
-			mount = forceMount;
-		else
-			mount = GetMountByFile(fileId);
-
+		auto* mount = GetMountByFile(fileId);
 		if (mount == nullptr)
 			return false;
 
 		return mount->ReadFileIntoString(fileId, outString);
 	}
 
-	bool Filesystem::ReadFileIntoMemory(MemBuffer& outMemBuffer, const StrId& fileId, Mount* forceMount) const
+	bool Filesystem::ReadFileIntoMemory(MemBuffer& outMemBuffer, const StrId& fileId) const
 	{
-		Mount* mount = nullptr;
-		if (forceMount)
-			mount = forceMount;
-		else
-			mount = GetMountByFile(fileId);
-
+		auto* mount = GetMountByFile(fileId);
 		if (mount == nullptr)
 			return false;
 

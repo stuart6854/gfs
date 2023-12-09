@@ -33,8 +33,8 @@ namespace gfs
 		/// Files
 		////////////////////////////////////////
 
-		bool ReadFileIntoString(std::string& outString, const StrId& fileId, Mount* forceMount = nullptr) const;
-		bool ReadFileIntoMemory(MemBuffer& outMemBuffer, const StrId& fileId, Mount* forceMount = nullptr) const;
+		bool ReadFileIntoString(std::string& outString, const StrId& fileId) const;
+		bool ReadFileIntoMemory(MemBuffer& outMemBuffer, const StrId& fileId) const;
 
 	private:
 		std::vector<std::unique_ptr<Mount>> m_mounts;
