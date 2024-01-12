@@ -27,14 +27,14 @@ namespace gfs
 		 * \param fileId
 		 * \return
 		 */
-		auto GetMountByFile(const StrId& fileId) const -> Mount*;
+		auto GetMountByFile(const FileId& fileId) const -> Mount*;
 
 		////////////////////////////////////////
 		/// Files
 		////////////////////////////////////////
 
-		bool ReadFileIntoString(std::string& outString, const StrId& fileId) const;
-		bool ReadFileIntoMemory(MemBuffer& outMemBuffer, const StrId& fileId) const;
+		bool ReadFileIntoString(std::string& outString, const FileId& fileId) const;
+		bool ReadFileIntoMemory(MemBuffer& outMemBuffer, const FileId& fileId) const;
 
 	private:
 		std::vector<std::unique_ptr<Mount>> m_mounts;

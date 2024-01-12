@@ -25,26 +25,26 @@ namespace gfs
 
 		void Flush() override;
 
-		bool DeleteFile(const StrId& fileId) override;
-		bool MoveFile(const StrId& fileId, const std::string& newFilename) override;
+		bool DeleteFile(const FileId& fileId) override;
+		bool MoveFile(const FileId& fileId, const std::string& newFilename) override;
 
-		bool HasFile(const StrId& fileId) const override;
+		bool HasFile(const FileId& fileId) const override;
 
 		bool WriteStringToFile(const std::string& filename, const std::string& text) override;
 		bool WriteMemoryToFile(const std::string& filename, const MemBuffer& memBuffer) override;
 
-		bool ReadFileIntoString(const StrId& fileId, std::string& outString) override;
-		bool ReadFileIntoMemory(const StrId& fileId, MemBuffer& outMemBuffer) override;
+		bool ReadFileIntoString(const FileId& fileId, std::string& outString) override;
+		bool ReadFileIntoMemory(const FileId& fileId, MemBuffer& outMemBuffer) override;
 
 	private:
 		struct File
 		{
-			StrId id;
+			FileId id;
 			std::string filename;
 		};
 		void AddFile(const std::string& filename);
 		void RemoveFile(const std::string& filename);
-		auto GetFile(const StrId& fileId) const -> const File*;
+		auto GetFile(const FileId& fileId) const -> const File*;
 
 		void DiscoverExistingFiles();
 		void SetupFilewatch();
@@ -53,7 +53,7 @@ namespace gfs
 		std::filesystem::path m_rootPath;
 		std::unique_ptr<filewatch::FileWatch<std::string>> m_filewatch;
 		mutable std::mutex m_mutex;
-		std::unordered_map<StrId, File> m_fileMap{};
+		std::unordered_map<FileId, File> m_fileMap{};
 	};
 
 } // namespace gfs

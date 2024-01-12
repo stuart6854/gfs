@@ -27,7 +27,7 @@ namespace gfs
 		////////////////////////////////////////
 
 		// virtual bool CreateFile(const FileId& fileId) = 0;
-		virtual bool DeleteFile(const StrId& fileId) = 0;
+		virtual bool DeleteFile(const FileId& fileId) = 0;
 
 		/**
 		 * \brief Used to both move and rename files.
@@ -35,15 +35,15 @@ namespace gfs
 		 * \param newFilename The filename to move the target to.
 		 * \return TRUE if successful.
 		 */
-		virtual bool MoveFile(const StrId& fileId, const std::string& newFilename) = 0;
+		virtual bool MoveFile(const FileId& fileId, const std::string& newFilename) = 0;
 
-		virtual bool HasFile(const StrId& fileId) const = 0;
+		virtual bool HasFile(const FileId& fileId) const = 0;
 
 		virtual bool WriteStringToFile(const std::string& filename, const std::string& text) = 0;
 		virtual bool WriteMemoryToFile(const std::string& filename, const MemBuffer& memBuffer) = 0;
 
-		virtual bool ReadFileIntoString(const StrId& fileId, std::string& outString) = 0;
-		virtual bool ReadFileIntoMemory(const StrId& fileId, MemBuffer& outMemBuffer) = 0;
+		virtual bool ReadFileIntoString(const FileId& fileId, std::string& outString) = 0;
+		virtual bool ReadFileIntoMemory(const FileId& fileId, MemBuffer& outMemBuffer) = 0;
 
 		////////////////////////////////////////
 		/// Getters

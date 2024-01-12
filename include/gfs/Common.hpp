@@ -9,28 +9,29 @@ namespace gfs
 {
 	using MemBuffer = std::vector<uint8_t>;
 
-	class StrId
+	class FileId
 	{
 	public:
-		StrId() = default;
-		StrId(const std::string& str) : m_id(std::hash<std::string>{}(str))
+		FileId() = default;
+		FileId(const std::string& str) : m_id(std::hash<std::string>{}(str))
 		{
 			if (str.empty())
 				m_id = 0;
 		}
-		StrId(const char* str) : StrId(std::string(str)) {}
-		StrId(const StrId&) = default;
-		StrId(StrId&&) = default;
-		~StrId() = default;
+		FileId(const char* str) : FileId(std::string(str)) {}
+		FileId(uint64_t id) : m_id(id) {}
+		FileId(const FileId&) = default;
+		FileId(FileId&&) = default;
+		~FileId() = default;
 
 		operator bool() const { return m_id != 0; }
 		operator uint64_t() const { return m_id; }
 
-		bool operator==(const StrId& rhs) const { return m_id == rhs.m_id; }
-		bool operator!=(const StrId& rhs) const { return !(*this == rhs); }
+		bool operator==(const FileId& rhs) const { return m_id == rhs.m_id; }
+		bool operator!=(const FileId& rhs) const { return !(*this == rhs); }
 
-		auto operator=(const StrId&) -> StrId& = default;
-		auto operator=(StrId&&) -> StrId& = default;
+		auto operator=(const FileId&) -> FileId& = default;
+		auto operator=(FileId&&) -> FileId& = default;
 
 	private:
 		uint64_t m_id = 0;
@@ -41,8 +42,8 @@ namespace gfs
 namespace std
 {
 	template <>
-	struct hash<gfs::StrId>
+	struct hash<gfs::FileId>
 	{
-		std::size_t operator()(const gfs::StrId& id) const noexcept { return id; }
+		std::size_t operator()(const gfs::FileId& id) const noexcept { return id; }
 	};
 } // namespace std

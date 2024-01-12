@@ -60,7 +60,7 @@ namespace gfs
 		return true;
 	}*/
 
-	bool PhysicalMount::DeleteFile(const StrId& fileId)
+	bool PhysicalMount::DeleteFile(const FileId& fileId)
 	{
 		if (!fileId)
 			return false;
@@ -79,7 +79,7 @@ namespace gfs
 		return true;
 	}
 
-	bool PhysicalMount::MoveFile(const StrId& fileId, const std::string& newFilename)
+	bool PhysicalMount::MoveFile(const FileId& fileId, const std::string& newFilename)
 	{
 		if (!fileId)
 			return false;
@@ -103,7 +103,7 @@ namespace gfs
 		return true;
 	}
 
-	bool PhysicalMount::HasFile(const StrId& fileId) const
+	bool PhysicalMount::HasFile(const FileId& fileId) const
 	{
 		if (!fileId)
 			return false;
@@ -117,7 +117,7 @@ namespace gfs
 		if (filename.empty() || std::filesystem::path(filename).extension().empty())
 			return false;
 
-		StrId fileId(filename);
+		FileId fileId(filename);
 		const auto* file = GetFile(fileId);
 		if (file)
 			return false;
@@ -147,7 +147,7 @@ namespace gfs
 		if (filename.empty() || std::filesystem::path(filename).extension().empty())
 			return false;
 
-		StrId fileId(filename);
+		FileId fileId(filename);
 		const auto* file = GetFile(fileId);
 		if (file)
 			return false;
@@ -173,7 +173,7 @@ namespace gfs
 		return true;
 	}
 
-	bool PhysicalMount::ReadFileIntoString(const StrId& fileId, std::string& outString)
+	bool PhysicalMount::ReadFileIntoString(const FileId& fileId, std::string& outString)
 	{
 		if (!HasFile(fileId))
 			return false;
@@ -198,7 +198,7 @@ namespace gfs
 		return outString.size() == fileSize;
 	}
 
-	bool PhysicalMount::ReadFileIntoMemory(const StrId& fileId, MemBuffer& outMemBuffer)
+	bool PhysicalMount::ReadFileIntoMemory(const FileId& fileId, MemBuffer& outMemBuffer)
 	{
 		if (!HasFile(fileId))
 			return false;
@@ -226,18 +226,18 @@ namespace gfs
 	void PhysicalMount::AddFile(const std::string& filename)
 	{
 		const std::lock_guard lock(m_mutex);
-		const File file = { StrId(filename), filename };
+		const File file = { FileId(filename), filename };
 		m_fileMap[file.id] = file;
 	}
 
 	void PhysicalMount::RemoveFile(const std::string& filename)
 	{
 		const std::lock_guard lock(m_mutex);
-		const StrId fileId(filename);
+		const FileId fileId(filename);
 		m_fileMap.erase(fileId);
 	}
 
-	auto PhysicalMount::GetFile(const StrId& fileId) const -> const File*
+	auto PhysicalMount::GetFile(const FileId& fileId) const -> const File*
 	{
 		const std::lock_guard lock(m_mutex);
 		const auto it = m_fileMap.find(fileId);
@@ -254,7 +254,7 @@ namespace gfs
 				continue;
 
 			const auto& path = dirEntry.path();
-			const auto fileId = StrId(path.string());
+			const auto fileId = FileId(path.string());
 			m_fileMap[fileId] = File{ fileId, path.string() };
 		}
 	}
