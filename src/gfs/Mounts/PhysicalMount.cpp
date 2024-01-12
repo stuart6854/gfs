@@ -11,14 +11,14 @@ namespace gfs
 
 	bool PhysicalMount::OnMount()
 	{
-		if (exists(m_rootPath))
-			return true;
+		if (!exists(m_rootPath))
+		{
+			std::error_code error{};
+			if (!create_directories(m_rootPath, error))
+				return false;
+		}
 
-		if (is_directory(m_rootPath))
-			return true;
-
-		std::error_code error{};
-		if (!create_directories(m_rootPath, error))
+		if (!is_directory(m_rootPath))
 			return false;
 
 		DiscoverExistingFiles();
