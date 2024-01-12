@@ -5,6 +5,9 @@
 #include <string>
 #include <utility>
 
+#undef DeleteFile
+#undef MoveFile
+
 namespace gfs
 {
 	class Mount
