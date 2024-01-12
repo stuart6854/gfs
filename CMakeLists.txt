@@ -66,7 +66,7 @@ CPMAddPackage(
 if (lz4_ADDED)
     option(LZ4_BUILD_CLI "Build lz4 program" OFF)
     option(LZ4_BUILD_LEGACY_LZ4C "Build lz4c program with legacy argument support" OFF)
-    add_subdirectory(${lz4_SOURCE_DIR}/build/cmake EXCLUDE_FROM_ALL SYSTEM)
+    add_subdirectory(${lz4_SOURCE_DIR}/build/cmake ${lz4_BINARY_DIR} EXCLUDE_FROM_ALL SYSTEM)
 endif ()
 
 # ---- Define GFS library ----
