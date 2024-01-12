@@ -5,8 +5,12 @@
 #include <FileWatch.hpp>
 
 #include <filesystem>
+#include <memory>
 #include <mutex>
 #include <unordered_map>
+
+#undef DeleteFile
+#undef MoveFile
 
 namespace gfs
 {

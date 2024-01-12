@@ -5,8 +5,8 @@ project(gfs LANGUAGES CXX)
 
 if (PROJECT_SOURCE_DIR STREQUAL PROJECT_BINARY_DIR)
     message(
-            FATAL_ERROR
-            "GFS - In-source builds not allowed. Please make a new directory (called a build directory) and run CMake from there."
+        FATAL_ERROR
+        "GFS - In-source builds not allowed. Please make a new directory (called a build directory) and run CMake from there."
     )
 endif ()
 
@@ -25,14 +25,18 @@ option(GFS_BUILD_TESTS "Build test" ${GFS_MASTER_PROJECT})
 
 # ---- Dependencies ----
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
 include(cmake/CPM.cmake)
 
 CPMAddPackage(
-        NAME filewatch
-        GIT_TAG a59891baf375b73ff28144973a6fafd3fe40aa21
-        GITHUB_REPOSITORY ThomasMonkman/filewatch
-        OPTIONS
-        "BuildTests OFF"
+    NAME filewatch
+    GIT_TAG a59891baf375b73ff28144973a6fafd3fe40aa21
+    GITHUB_REPOSITORY ThomasMonkman/filewatch
+    OPTIONS
+    "BuildTests OFF"
 )
 if (filewatch_ADDED)
     add_library(filewatch INTERFACE)
@@ -40,11 +44,11 @@ if (filewatch_ADDED)
 endif ()
 
 CPMAddPackage(
-        NAME nlohmann_json
-        VERSION 3.11.3
-        # the git repo is incredibly large, so we download the archived include directory
-        URL https://github.com/nlohmann/json/releases/download/v3.11.3/include.zip
-        URL_HASH SHA256=a22461d13119ac5c78f205d3df1db13403e58ce1bb1794edc9313677313f4a9d
+    NAME nlohmann_json
+    VERSION 3.11.3
+    # the git repo is incredibly large, so we download the archived include directory
+    URL https://github.com/nlohmann/json/releases/download/v3.11.3/include.zip
+    URL_HASH SHA256=a22461d13119ac5c78f205d3df1db13403e58ce1bb1794edc9313677313f4a9d
 )
 if (nlohmann_json_ADDED)
     add_library(nlohmann_json INTERFACE IMPORTED)
@@ -54,10 +58,10 @@ endif ()
 CPMAddPackage("gh:fraillt/bitsery#v5.2.3")
 
 CPMAddPackage(
-        NAME lz4
-        GIT_REPOSITORY https://github.com/lz4/lz4.git
-        VERSION 1.9.4
-        DOWNLOAD_ONLY YES
+    NAME lz4
+    GIT_REPOSITORY https://github.com/lz4/lz4.git
+    VERSION 1.9.4
+    DOWNLOAD_ONLY YES
 )
 if (lz4_ADDED)
     option(LZ4_BUILD_CLI "Build lz4 program" OFF)
@@ -73,23 +77,13 @@ file(GLOB_RECURSE GFS_HEADERS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/inc
 file(GLOB_RECURSE GFS_SOURCE CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 
 add_library(gfs ${GFS_HEADERS} ${GFS_SOURCE})
-set_target_properties(gfs PROPERTIES
-        CXX_STANDARD 17
-        CXX_STANDARD_REQUIRED ON
-        CXX_EXTENSIONS OFF
-)
 set(GFS_COMPILE_FLAGS
 
 )
 target_compile_options(${PROJECT_NAME}
-        PUBLIC
-        $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:
-        -Werror -Wall -Wextra
-        $<$<CONFIG:Debug>:-Wpedantic -pedantic-errors>
-        >
-        $<$<CXX_COMPILER_ID:MSVC>:
-        /permissive-
-        >
+    PUBLIC
+    $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Werror -Wall -Wextra $<$<CONFIG:Debug>:-Wpedantic -pedantic-errors>>
+    $<$<CXX_COMPILER_ID:MSVC>:/permissive->
 )
 
 
@@ -98,8 +92,8 @@ target_include_directories(gfs SYSTEM INTERFACE include)
 
 # Link dependencies
 target_link_libraries(gfs
-        PRIVATE nlohmann_json Bitsery::bitsery lz4_static
-        PUBLIC filewatch
+    PRIVATE nlohmann_json Bitsery::bitsery lz4_static
+    PUBLIC filewatch
 )
 
 # ---- Tests ----

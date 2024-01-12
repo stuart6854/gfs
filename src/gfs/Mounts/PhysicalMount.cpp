@@ -261,7 +261,7 @@ namespace gfs
 
 	void PhysicalMount::SetupFilewatch()
 	{
-		m_filewatch = std::make_unique<filewatch::FileWatch<std::string>>(m_rootPath, [this](const std::string& file, const filewatch::Event event) {
+		m_filewatch = std::make_unique<filewatch::FileWatch<std::string>>(m_rootPath.string(), [this](const std::string& file, const filewatch::Event event) {
 			switch (event)
 			{
 				case filewatch::Event::added:
