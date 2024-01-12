@@ -1,6 +1,7 @@
 #include "gfs/Mounts/PhysicalMount.hpp"
 
 #include <fstream>
+#include <iostream>
 #include <iterator>
 #include <utility>
 
@@ -228,6 +229,8 @@ namespace gfs
 		const std::lock_guard lock(m_mutex);
 		const File file = { FileId(filename), filename };
 		m_fileMap[file.id] = file;
+
+		std::cout << "File added: " << uint64_t(file.id) << " - " << file.filename << std::endl;
 	}
 
 	void PhysicalMount::RemoveFile(const std::string& filename)
@@ -235,6 +238,8 @@ namespace gfs
 		const std::lock_guard lock(m_mutex);
 		const FileId fileId(filename);
 		m_fileMap.erase(fileId);
+
+		std::cout << "File removed: " << uint64_t(fileId) << " - " << filename << std::endl;
 	}
 
 	auto PhysicalMount::GetFile(const FileId& fileId) const -> const File*
@@ -254,8 +259,9 @@ namespace gfs
 				continue;
 
 			const auto& path = dirEntry.path();
-			const auto fileId = FileId(path.string());
-			m_fileMap[fileId] = File{ fileId, path.string() };
+			// const auto fileId = FileId(path.string());
+			// m_fileMap[fileId] = File{ fileId, path.string() };
+			AddFile(path.string());
 		}
 	}
 
