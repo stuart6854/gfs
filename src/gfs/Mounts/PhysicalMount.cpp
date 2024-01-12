@@ -227,7 +227,7 @@ namespace gfs
 	void PhysicalMount::AddFile(const std::string& filename)
 	{
 		const std::lock_guard lock(m_mutex);
-		const File file = { FileId(filename), filename };
+		const File file = { FileId(filename), std::filesystem::relative(filename, m_rootPath).string() };
 		m_fileMap[file.id] = file;
 
 		std::cout << "File added: " << uint64_t(file.id) << " - " << file.filename << std::endl;
